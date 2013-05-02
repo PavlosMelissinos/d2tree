@@ -1,0 +1,14 @@
+*.xml
+bin/
+lib/
+dummy/
+.classpath
+.project
+.settings/
+d-p2p-sim(vldb2009)/
+*.jar
+protocols/
+src/chord/
+src/dummy/
+*.png
+src/p2p/
