@@ -27,7 +27,6 @@ public class RoutingTable {
 	private long leftAdjacentNode;
 	private long rightAdjacentNode;
 	
-	
 	//buckets
 	private long bucketNode;
 	private long representative;

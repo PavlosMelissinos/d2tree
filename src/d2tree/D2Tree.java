@@ -1,8 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package d2tree;
 
 import java.lang.Thread.State;
@@ -11,10 +6,6 @@ import p2p.simulator.message.Message;
 import p2p.simulator.network.Network;
 import p2p.simulator.protocol.Peer;
 
-/**
- *
- * @author Pavlos Melissinos
- */
 public class D2Tree extends Peer {
 
     private Network Net;
@@ -27,13 +18,13 @@ public class D2Tree extends Peer {
     private Logger logger;
 
     @Override
-    public void init(long id, long N, long K, Network Net) {
+    public void init(long id, long n, long k, Network Net) {
         
         this.Net            = Net;
         this.Id             = id;
         this.isOnline       = false;
         this.state          = Thread.State.NEW;
-        this.Core           = new D2TreeCore(Id, N, K, Net);
+        this.Core           = new D2TreeCore(Id, n, k, Net);
         this.pendingQueries = 0;
         this.introducer     = 1;
         
@@ -72,6 +63,9 @@ public class D2Tree extends Peer {
             case D2TreeMessageT.LOOKUP_RES:
                 pendingQueries--;
                 break;
+//            case D2TreeMessageT.UPDATE_SIZE_REQ:
+//            	this.Core.size++;
+//            	forwardUpdateSizeRequest(msg);
             default:
                 System.out.println("Unrecognized message type: "+mType);
         }

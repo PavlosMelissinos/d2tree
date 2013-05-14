@@ -1,16 +1,7 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package d2tree;
 
 import p2p.simulator.message.MessageBody;
 
-/**
- *
- * @author Pavlos Melissinos
- */
 public class ConnectMessage extends MessageBody {
 	private static final long serialVersionUID = 1363832437446636196L;
 	private RoutingTable rt;
