@@ -89,13 +89,13 @@ public class RoutingTable {
     void setLeftRoutingTable(Vector<Long> values) {
     	this.leftRoutingTable = values;
     }
-    Vector<Long> getLeftRoutingTable() {
+    Vector<Long> getLeftRT() {
     	return this.leftRoutingTable;
     }
     void setRightRoutingTable(Vector<Long> values) {
     	this.rightRoutingTable = values;
     }
-    Vector<Long> getRightRoutingTable() {
+    Vector<Long> getRightRT() {
     	return this.rightRoutingTable;
     }
     

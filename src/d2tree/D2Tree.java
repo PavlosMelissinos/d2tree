@@ -24,7 +24,7 @@ public class D2Tree extends Peer {
         this.Id             = id;
         this.isOnline       = false;
         this.state          = Thread.State.NEW;
-        this.Core           = new D2TreeCore(Id, n, k, Net);
+        this.Core           = new D2TreeCore(Id, Net);
         this.pendingQueries = 0;
         this.introducer     = 1;
         
@@ -54,6 +54,11 @@ public class D2Tree extends Peer {
                 Core.forwardJoinRequest(msg);
                 break;
             case D2TreeMessageT.JOIN_RES:
+//            	if (Core.isLeaf()){
+//            		Long size = Core.storedMsgData.get(D2TreeCore.BUCKET_SIZE);
+//            		long newSize = size != null ? size + 1 : 1;
+//            		Core.storedMsgData.put(D2TreeCore.BUCKET_SIZE, newSize);
+//            	}
                 Core.connect(msg);
                 isOnline = true;
                 break;
@@ -66,6 +71,8 @@ public class D2Tree extends Peer {
 //            case D2TreeMessageT.UPDATE_SIZE_REQ:
 //            	this.Core.size++;
 //            	forwardUpdateSizeRequest(msg);
+            case D2TreeMessageT.REDISTRIBUTE_REQ:
+            	Core.forwardBucketRedistributionRequest(msg);
             default:
                 System.out.println("Unrecognized message type: "+mType);
         }

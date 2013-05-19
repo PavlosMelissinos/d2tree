@@ -9,5 +9,8 @@ public class D2TreeMessageT extends MessageT {
     static final int REDISTRIBUTE_REQ     = 1003;
     static final int GET_SUBTREE_SIZE_REQ = 1004;
     static final int CHECK_BALANCE_REQ    = 1005;
+    static final int EXTEND_CONTRACT_REQ  = 1006;
+    static final int EXTEND_REQ           = 1007;
+    static final int CONTRACT_REQ         = 1008;
 //    static final int UPDATE_SIZE_REQ  = 1004;
 }
