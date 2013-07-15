@@ -12,7 +12,20 @@ import java.util.Vector;
  * @author Pavlos Melissinos
  */
 public class RoutingTable {
-	public static int DEF_VAL = -1;
+	public static Long DEF_VAL = -1L;
+	public static enum Role {
+		LEFT_CHILD,
+		RIGHT_CHILD,
+		PARENT,
+		LEFT_NEIGHBOR,
+		RIGHT_NEIGHBOR,
+		LEFT_RT,
+		RIGHT_RT,
+		LEFT_A_NODE,
+		RIGHT_A_NODE,
+		BUCKET_NODE,
+		REPRESENTATIVE;
+	};
 
 	//base tree
 	private long leftChild;
@@ -20,8 +33,8 @@ public class RoutingTable {
 	private long parent;
 	
 	//level groups
-	private Vector<Long> leftRoutingTable;
-	private Vector<Long> rightRoutingTable;
+	private Vector<Long> leftRT;
+	private Vector<Long> rightRT;
 
 	//adjacency
 	private long leftAdjacentNode;
@@ -36,8 +49,8 @@ public class RoutingTable {
         this.rightChild = DEF_VAL;
         this.parent = DEF_VAL;
         
-        this.leftRoutingTable = new Vector<Long>();
-        this.rightRoutingTable = new Vector<Long>();
+        this.leftRT = new Vector<Long>();
+        this.rightRT = new Vector<Long>();
         
         this.leftAdjacentNode = DEF_VAL;
         this.rightAdjacentNode = DEF_VAL;
@@ -86,17 +99,17 @@ public class RoutingTable {
         return this.rightAdjacentNode;
     }
     
-    void setLeftRoutingTable(Vector<Long> values) {
-    	this.leftRoutingTable = values;
+    void setLeftRT(Vector<Long> values) {
+    	this.leftRT = values;
     }
     Vector<Long> getLeftRT() {
-    	return this.leftRoutingTable;
+    	return this.leftRT;
     }
-    void setRightRoutingTable(Vector<Long> values) {
-    	this.rightRoutingTable = values;
+    void setRightRT(Vector<Long> values) {
+    	this.rightRT = values;
     }
     Vector<Long> getRightRT() {
-    	return this.rightRoutingTable;
+    	return this.rightRT;
     }
     
     void setBucketNode(Long node){
@@ -115,8 +128,11 @@ public class RoutingTable {
     
     int size() {
     	int size = 7;
-    	size += leftRoutingTable.size();
-    	size += rightRoutingTable.size();
+    	size += leftRT.size();
+    	size += rightRT.size();
         return size;
+    }
+    long getHeight(){ 
+    	return Math.max(leftRT.size(), rightRT.size());
     }
 }

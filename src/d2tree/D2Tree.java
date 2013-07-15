@@ -54,25 +54,35 @@ public class D2Tree extends Peer {
                 Core.forwardJoinRequest(msg);
                 break;
             case D2TreeMessageT.JOIN_RES:
-//            	if (Core.isLeaf()){
-//            		Long size = Core.storedMsgData.get(D2TreeCore.BUCKET_SIZE);
-//            		long newSize = size != null ? size + 1 : 1;
-//            		Core.storedMsgData.put(D2TreeCore.BUCKET_SIZE, newSize);
-//            	}
                 Core.connect(msg);
                 isOnline = true;
                 break;
-            case D2TreeMessageT.LOOKUP_REQ:
-                Core.forwardLookupRequest(msg);
-                break;
-            case D2TreeMessageT.LOOKUP_RES:
-                pendingQueries--;
-                break;
-//            case D2TreeMessageT.UPDATE_SIZE_REQ:
-//            	this.Core.size++;
-//            	forwardUpdateSizeRequest(msg);
             case D2TreeMessageT.REDISTRIBUTE_REQ:
-            	Core.forwardBucketRedistributionRequest(msg);
+            	Core.forwardBucketRedistributionRequest(msg); break;
+            case D2TreeMessageT.REDISTRIBUTE_RES:
+            	Core.forwardBucketRedistributionResponse(msg); break;
+            case D2TreeMessageT.GET_SUBTREE_SIZE_REQ:
+            	Core.forwardGetSubtreeSizeRequest(msg); break;
+            case D2TreeMessageT.GET_SUBTREE_SIZE_RES:
+            	Core.forwardGetSubtreeSizeResponse(msg); break;
+            case D2TreeMessageT.CHECK_BALANCE_REQ:
+            	Core.forwardCheckBalanceRequest(msg); break;
+            case D2TreeMessageT.EXTEND_CONTRACT_REQ:
+            	Core.forwardExtendContractRequest(msg); break;
+            case D2TreeMessageT.EXTEND_REQ:
+            	Core.forwardExtendRequest(msg); break;
+            case D2TreeMessageT.CONTRACT_REQ:
+            	Core.forwardContractRequest(msg); break;
+            case D2TreeMessageT.TRANSFER_REQ:
+            	Core.forwardTransferRequest(msg); break;
+            case D2TreeMessageT.TRANSFER_RES:
+            	Core.forwardTransferResponse(msg); break;
+            case D2TreeMessageT.DISCONNECT_MSG:
+            	Core.disconnect(msg); break;
+            case D2TreeMessageT.LOOKUP_REQ:
+                Core.forwardLookupRequest(msg); break;
+            case D2TreeMessageT.LOOKUP_RES:
+                pendingQueries--; break;
             default:
                 System.out.println("Unrecognized message type: "+mType);
         }

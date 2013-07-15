@@ -5,15 +5,18 @@ import p2p.simulator.message.MessageBody;
 public class ExtendContractRequest extends MessageBody {
 	
 	private static final long serialVersionUID = -671508466340485564L;
-	private int msgType;
+	private long height;
 	
-    public ExtendContractRequest(int msgType) {
-    	this.msgType = msgType;
+    public ExtendContractRequest(long height) {
+    	this.height = height;
     }
     
+    long getHeight(){
+    	return this.height;
+    }
     @Override
     public int getType() {
-        return this.msgType;
+        return D2TreeMessageT.EXTEND_CONTRACT_REQ;
     }
 
 }

@@ -25,7 +25,7 @@ public class GetSubtreeSizeResponse extends MessageBody {
 	}
 	@Override
 	public int getType() {
-        return D2TreeMessageT.GET_SUBTREE_SIZE_REQ;
+        return D2TreeMessageT.GET_SUBTREE_SIZE_RES;
 	}
 
 }

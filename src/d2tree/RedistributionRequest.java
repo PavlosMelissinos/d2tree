@@ -2,18 +2,20 @@ package d2tree;
 
 import p2p.simulator.message.MessageBody;
 
-public class RedistributeRequest extends MessageBody {
+public class RedistributionRequest extends MessageBody {
 	
 	private static final long serialVersionUID = 3137280817627914419L;
 	static long DEF_VAL = -1;
 	private long subtreeID; //the id of this subtree's root
 	private long noofUncheckedBucketNodes;
 	private long noofUncheckedBuckets;
+	private long transferDest;
 
-    public RedistributeRequest(long noofUncheckedBucketNodes, long noofUncheckedBuckets, long subtreeID) {
+    public RedistributionRequest(long noofUncheckedBucketNodes, long noofUncheckedBuckets, long subtreeID) {
     	this.noofUncheckedBucketNodes = noofUncheckedBucketNodes;
     	this.noofUncheckedBuckets = noofUncheckedBuckets;
     	this.subtreeID = subtreeID;
+    	transferDest = DEF_VAL;
     }
     public long getNoofUncheckedBucketNodes(){
     	return noofUncheckedBucketNodes;
@@ -23,7 +25,13 @@ public class RedistributeRequest extends MessageBody {
     	
     }
     long getSubtreeID(){
-    	return this.subtreeID;
+    	return subtreeID;
+    }
+    long getTransferDest(){
+    	return transferDest;
+    }
+    void setTransferDest(long dest){
+    	this.transferDest = dest;
     }
     
     @Override
