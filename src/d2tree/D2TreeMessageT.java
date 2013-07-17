@@ -23,29 +23,29 @@ public class D2TreeMessageT extends MessageT {
     	case JOIN_REQ:
     		return "JOIN REQUEST";
     	case JOIN_RES:
-    		return "JOIN REQUEST";
+    		return "JOIN RESPONSE";
     	case REDISTRIBUTE_REQ:
-    		return "JOIN REQUEST";
+    		return "REDISTRIBUTE REQUEST";
     	case REDISTRIBUTE_RES:
-    		return "JOIN REQUEST";
+    		return "REDISTRIBUTE RESPONSE";
     	case GET_SUBTREE_SIZE_REQ:
-    		return "JOIN REQUEST";
+    		return "GET SUBTREE SIZE REQUEST";
     	case GET_SUBTREE_SIZE_RES:
-    		return "JOIN REQUEST";
+    		return "GET SUBTREE SIZE RESPONSE";
     	case CHECK_BALANCE_REQ:
-    		return "JOIN REQUEST";
+    		return "CHECK BALANCE REQUEST";
     	case EXTEND_CONTRACT_REQ:
-    		return "JOIN REQUEST";
+    		return "EXTEND-CONTRACT REQUEST";
     	case EXTEND_REQ:
-    		return "JOIN REQUEST";
+    		return "EXTEND REQUEST";
     	case CONTRACT_REQ:
-    		return "JOIN REQUEST";
+    		return "CONTRACT REQUEST";
     	case TRANSFER_REQ:
-    		return "JOIN REQUEST";
+    		return "TRANSFER REQUEST";
     	case TRANSFER_RES:
-    		return "JOIN REQUEST";
+    		return "TRANSFER RESPONSE";
     	case DISCONNECT_MSG:
-    		return "JOIN REQUEST";
+    		return "DISCONNECT REQUEST";
     	default:
     		return "WRONG TYPE";
     	}

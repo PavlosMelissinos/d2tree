@@ -11,10 +11,12 @@ public class ConnectMessage extends MessageBody {
 	private int index;
 	public ConnectMessage(long node, Role role){
 		this.role = role;
+		this.node = node;
 		this.index = 0;
 	}
 	public ConnectMessage(long node, Role role, int index){
 		this.role = role;
+		this.node = node;
 		this.index = index;
 	}
 	public Role getRole(){

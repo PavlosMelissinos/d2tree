@@ -12,3 +12,4 @@ src/chord/
 src/dummy/
 *.png
 src/p2p/
+d-p2p-sim.log
