@@ -1,5 +1,8 @@
 package d2tree;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -65,19 +68,21 @@ public class D2TreeCore {
         
         if (isBucketNode()){
         	if (this.rt.getRightRT().isEmpty()) {//core is the last bucket node of the bucket
-                String printMsg = "Node " + id + " added to the bucket of " +
+        		Date date = new Date();
+        		String printMsg = date.getTime() + ": Node " + id + " has been added to the bucket of " +
                 		rt.getRepresentative() + " after " + msg.getHops() + " hops.";
+                Message msg1 = msg;
                 msg = new Message(id, newNodeId, new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE));
                 net.sendMsg(msg);
                 msg = new Message(id, newNodeId, new ConnectMessage(id, Role.LEFT_NEIGHBOR));
-                
-                long rightNeighbor = newNodeId;
+            	this.print(msg1, printMsg);
+
+            	long rightNeighbor = newNodeId;
                 Vector<Long> rightRT = new Vector<Long>();
                 rightRT.add(rightNeighbor);
                 this.rt.setRightRT(rightRT);
                 msg = new Message(id, rt.getRepresentative(), new CheckBalanceRequest());
                 net.sendMsg(msg);
-            	this.print(msg.getType(), printMsg);
         		
         	}
             else{ //forward to next bucket node
@@ -638,33 +643,42 @@ public class D2TreeCore {
     	if (this.isBucketNode()){
     		Vector<Long> rightRT = rt.getRightRT();
 			GetSubtreeSizeRequest msgData = (GetSubtreeSizeRequest)msg.getData();
+			//TODO Fix bug (forwardGetSubtreeSizeRequest is seemingly called twice for nodes that are last in their buckets)
 			msgData.incrementSize();
 			msg.setData(msgData);
     		if (rightRT.isEmpty()){ //node is last in its bucket
-		    	String printMsg = "Node " + this.id + " is the last in its bucket (size = " + msgData.getSize() +
+    			Date date = new Date();
+    			//String printMsg = date.getTime() + ": Node " + this.id + " is the last in its bucket (size = " + msgData.getSize() +
+        		String printMsg = date.getTime() + ": Node " + this.id + " is the last in its bucket (size = " + (msg.getHops() - 1) +
     					"). Sending response to its representative, with id " + rt.getRepresentative() + ".";
-		    	//this.print(msg.getType(), printMsg);
+		    	this.print(msg, printMsg);
                 //msg = new Message(id, msg.getSourceId(), new GetSubtreeSizeResponse(treeSize));
     			msg = new Message(id, rt.getRepresentative(),
-    					new GetSubtreeSizeResponse(msgData.getSize(), msg.getSourceId()));
+    					//new GetSubtreeSizeResponse(msgData.getSize(), msg.getSourceId()));
+    					new GetSubtreeSizeResponse(msg.getHops() - 1, msg.getSourceId()));
+    			net.sendMsg(msg);
     		}
     		else {
-		    	String printMsg = "Forwarding request to its right neighbor, with id "
-    					+ rt.getRightRT().get(0) + ".";
-		    	//this.print(msg.getType(), printMsg);
+		    	String printMsg = "Node " + this.id +
+		    			". Forwarding request to its right neighbor, with id " + rt.getRightRT().get(0) +
+		    			". (size = " + msgData.getSize() + ")";
+		    	this.print(msg, printMsg);
     			long rightNeighbour = rightRT.get(0);
     			msg.setDestinationId(rightNeighbour);
+    			net.sendMsg(msg);
     		}
-			net.sendMsg(msg);
     	}
     	else if (this.isLeaf()){
 	    	String printMsg = "Node " + this.id + " is a leaf. Forwarding to bucket node with id "
 	    			+ rt.getBucketNode() + ".";
-	    	//this.print(msg.getType(), printMsg);
+	    	this.print(msg, printMsg);
     		msg.setDestinationId(rt.getBucketNode());
     		net.sendMsg(msg);
     	}
     	else{
+	    	String printMsg = "Node " + this.id + " is an inner node. Forwarding to its children with ids "
+	    			+ rt.getLeftChild() + " and " + rt.getRightChild() + ".";
+	    	this.print(msg, printMsg);
     		msg.setDestinationId(rt.getLeftChild());
     		net.sendMsg(msg);
     		msg.setDestinationId(rt.getRightChild());
@@ -685,10 +699,16 @@ public class D2TreeCore {
     	GetSubtreeSizeResponse data = (GetSubtreeSizeResponse)msg.getData();
     	long givenSize = data.getSize();
     	long destinationID = data.getDestinationID();
-    	
+
+    	if (this.isLeaf()){
+    		Date date = new Date();
+    		String printMsg = date.getTime() + ": Node " + this.id +
+    			" is a leaf. Destination ID = " + destinationID + ". (bucket size = " + data.getSize() + ")";
+    		this.print(msg, printMsg);
+    	}
 		if (this.isLeaf() && id == destinationID && this.storedMsgData.get(MODE) == MODE_REDISTRIBUTION){
-	    	String printMsg = "Redistribution mode.";
-	    	//this.print(msg.getType(), printMsg);
+			String printMsg = "Node " + id + " is not right.";
+	    	this.print(msg, printMsg);
 			//we've just found out how many nodes this bucket contains so 
 			//we now know if we need to add or remove any nodes from here
 			
@@ -743,12 +763,15 @@ public class D2TreeCore {
 			if (this.isRoot()){
 		    	String printMsg = "Node " + this.id +
 		    			" is leaf and root. Computing bucket size...";
-		    	//this.print(msg.getType(), printMsg);
+		    	this.print(msg, printMsg);
 				msg = new Message(msg.getSourceId(), id, new GetSubtreeSizeRequest());
 				forwardGetSubtreeSizeRequest(msg);
 				net.sendMsg(msg);
 			}
 			else{
+		    	String printMsg = "Node " + this.id +
+		    			" is a leaf. Forwarding request to parent...";
+		    	this.print(msg, printMsg);
 				msg.setDestinationId(rt.getParent());
 				net.sendMsg(msg);
 			}
@@ -768,6 +791,9 @@ public class D2TreeCore {
 		else {
 			if (!isBalanced()){
 				if (!this.isRoot()){
+			    	String printMsg = "Node " + this.id +
+			    			" is an unbalanced inner node. Forwarding request to parent...";
+			    	this.print(msg, printMsg);
 					msg = new Message(id, rt.getParent(), new CheckBalanceRequest());
 					net.sendMsg(msg);
 				}
@@ -904,8 +930,12 @@ public class D2TreeCore {
     	return Math.max(rt.getLeftRT().size(), rt.getRightRT().size());
     }
     
-    void print(int msgType, String printMsg){
+    /*void print(int msgType, String printMsg){
     	System.out.println(D2TreeMessageT.toString(msgType) +
     			": " + printMsg);
+    }*/
+    void print(Message msg, String printMsg){
+    	System.out.println("\n" + D2TreeMessageT.toString(msg.getType()) +
+    			"(Message ID = " + msg.getMsgId() + "): " + printMsg + " Hops = " + msg.getHops());
     }
 }

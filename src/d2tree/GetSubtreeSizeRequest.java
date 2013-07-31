@@ -7,7 +7,7 @@ public class GetSubtreeSizeRequest extends MessageBody {
 	private long size;
 	
 	public GetSubtreeSizeRequest(){
-		this.size = 1;
+		this.size = 0;
 	}
 	public long getSize(){
 		return this.size;
