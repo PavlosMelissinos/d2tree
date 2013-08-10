@@ -28,7 +28,7 @@ public class ExtendResponse extends MessageBody {
 	
     @Override
     public int getType() {
-        return D2TreeMessageT.EXTEND_REQ;
+        return D2TreeMessageT.EXTEND_RES;
     }
 
 }

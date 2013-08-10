@@ -4,7 +4,9 @@ import p2p.simulator.message.MessageBody;
 
 public class CheckBalanceRequest extends MessageBody {
 
-    public CheckBalanceRequest() {
+	private static final long serialVersionUID = 2100066121599892428L;
+
+	public CheckBalanceRequest() {
     }
     
     @Override

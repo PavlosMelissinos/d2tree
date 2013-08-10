@@ -8,7 +8,7 @@ public class GetSubtreeSizeResponse extends MessageBody {
 	private long finalDestID;
 	
 	public GetSubtreeSizeResponse(){
-		this.size = 1;
+		this.size = 0;
 	}	
 	public GetSubtreeSizeResponse(long size, long finalDestID){
 		this.size = size;
@@ -20,9 +20,9 @@ public class GetSubtreeSizeResponse extends MessageBody {
 	public long getSize(){
 		return this.size;
 	}
-	public void incrementSize(){
+	/*public void incrementSize(){
 		this.size++;
-	}
+	}*/
 	@Override
 	public int getType() {
         return D2TreeMessageT.GET_SUBTREE_SIZE_RES;

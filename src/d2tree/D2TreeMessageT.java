@@ -13,10 +13,11 @@ public class D2TreeMessageT extends MessageT {
     static final int CHECK_BALANCE_REQ    = 1007;
     static final int EXTEND_CONTRACT_REQ  = 1008;
     static final int EXTEND_REQ           = 1009;
-    static final int CONTRACT_REQ         = 1010;
-    static final int TRANSFER_REQ         = 1011;
-    static final int TRANSFER_RES         = 1012;
-    static final int DISCONNECT_MSG       = 1013;
+    static final int EXTEND_RES           = 1010;
+    static final int CONTRACT_REQ         = 1011;
+    static final int TRANSFER_REQ         = 1012;
+    static final int TRANSFER_RES         = 1013;
+    static final int DISCONNECT_MSG       = 1014;
     
     public static String toString(int msgType){
     	switch(msgType){
@@ -38,6 +39,8 @@ public class D2TreeMessageT extends MessageT {
     		return "EXTEND-CONTRACT REQUEST";
     	case EXTEND_REQ:
     		return "EXTEND REQUEST";
+    	case EXTEND_RES:
+    		return "EXTEND RESPONSE";
     	case CONTRACT_REQ:
     		return "CONTRACT REQUEST";
     	case TRANSFER_REQ:
