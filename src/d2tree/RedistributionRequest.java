@@ -10,12 +10,14 @@ public class RedistributionRequest extends MessageBody {
 	private long noofUncheckedBucketNodes;
 	private long noofUncheckedBuckets;
 	private long transferDest;
-
-    public RedistributionRequest(long noofUncheckedBucketNodes, long noofUncheckedBuckets, long subtreeID) {
+	private long initialNode;
+	
+    public RedistributionRequest(long noofUncheckedBucketNodes, long noofUncheckedBuckets, long subtreeID, long initialNode) {
     	this.noofUncheckedBucketNodes = noofUncheckedBucketNodes;
     	this.noofUncheckedBuckets = noofUncheckedBuckets;
     	this.subtreeID = subtreeID;
     	transferDest = DEF_VAL;
+    	this.initialNode = initialNode;
     }
     public long getNoofUncheckedBucketNodes(){
     	return noofUncheckedBucketNodes;
@@ -27,6 +29,9 @@ public class RedistributionRequest extends MessageBody {
     long getSubtreeID(){
     	return subtreeID;
     }
+	long getInitialNode(){
+		return initialNode;
+	}
     long getTransferDest(){
     	return transferDest;
     }

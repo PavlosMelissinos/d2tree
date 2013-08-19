@@ -71,6 +71,8 @@ public class D2Tree extends Peer {
             	Core.forwardExtendContractRequest(msg); break;
             case D2TreeMessageT.EXTEND_REQ:
             	Core.forwardExtendRequest(msg); break;
+            case D2TreeMessageT.EXTEND_RES:
+            	Core.forwardExtendResponse(msg); break;
             case D2TreeMessageT.CONTRACT_REQ:
             	Core.forwardContractRequest(msg); break;
             case D2TreeMessageT.TRANSFER_REQ:
@@ -83,6 +85,8 @@ public class D2Tree extends Peer {
                 Core.forwardLookupRequest(msg); break;
             case D2TreeMessageT.LOOKUP_RES:
                 pendingQueries--; break;
+            case D2TreeMessageT.PRINT_MSG:
+                Core.printTree(msg); break;
             default:
                 System.out.println("Unrecognized message type: "+mType);
         }
@@ -124,7 +128,8 @@ public class D2Tree extends Peer {
 
     @Override
     public void leavePeer() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        //throw new UnsupportedOperationException("Not supported yet.");
+    	//System.out.println("Not supported yet.");
     }
 
     @Override
@@ -139,12 +144,14 @@ public class D2Tree extends Peer {
 
     @Override
     public void insert(long key) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        //throw new UnsupportedOperationException("Not supported yet.");
+    	//System.out.println("Not supported yet.");
     }
 
     @Override
     public void delete(long key) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        //throw new UnsupportedOperationException("Not supported yet.");
+    	//System.out.println("Not supported yet.");
     }
 
     @Override

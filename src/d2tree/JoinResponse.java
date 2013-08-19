@@ -14,10 +14,14 @@ import p2p.simulator.message.MessageBody;
 public class JoinResponse extends MessageBody {
 	private static final long serialVersionUID = 2277970268976064781L;
 
-	JoinResponse() {
-        
+	private long initialNode;
+	
+	JoinResponse(long initialNode) {
+        this.initialNode = initialNode;
     }
-
+	long getInitialNode(){
+		return initialNode;
+	}
     @Override
     public int getType() {
         return D2TreeMessageT.JOIN_RES;

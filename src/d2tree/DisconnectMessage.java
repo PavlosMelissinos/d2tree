@@ -9,10 +9,15 @@ public class DisconnectMessage extends MessageBody {
 
 	private Role role;
 	private long nodeToRemove;
+	private long initialNode;
 	
-	public DisconnectMessage(long nodeToRemove, Role role){
+	public DisconnectMessage(long nodeToRemove, Role role, long initialNode){
 		this.role = role;
 		this.nodeToRemove = nodeToRemove;
+		this.initialNode = initialNode;
+	}
+	long getInitialNode(){
+		return initialNode;
 	}
 	public Role getRole(){
 		return this.role;

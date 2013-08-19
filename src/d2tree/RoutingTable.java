@@ -5,6 +5,7 @@
 
 package d2tree;
 
+import java.io.PrintWriter;
 import java.util.Vector;
 
 /**
@@ -134,5 +135,16 @@ public class RoutingTable {
     }
     long getHeight(){ 
     	return Math.max(leftRT.size(), rightRT.size());
+    }
+    void print(PrintWriter out){
+		out.println("P = " + getParent() +
+				", LC = " + getLeftChild() +
+				", RC = " + getRightChild() +
+				", LA = " + getLeftAdjacentNode() +
+				", RA = " + getRightAdjacentNode() +
+				", LRT = " + getLeftRT() +
+				", RRT = " + getRightRT() +
+				", BN = " + getBucketNode() +
+				", RN = " + getRepresentative());
     }
 }

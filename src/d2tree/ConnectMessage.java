@@ -9,15 +9,21 @@ public class ConnectMessage extends MessageBody {
 	private Role role;
 	private long node;
 	private int index;
-	public ConnectMessage(long node, Role role){
+	private long initialNode;
+	public ConnectMessage(long node, Role role, long initialNode){
 		this.role = role;
 		this.node = node;
 		this.index = 0;
+		this.initialNode = initialNode;
 	}
-	public ConnectMessage(long node, Role role, int index){
+	public ConnectMessage(long node, Role role, int index, long initialNode){
 		this.role = role;
 		this.node = node;
 		this.index = index;
+		this.initialNode = initialNode;
+	}
+	long getInitialNode(){
+		return initialNode;
 	}
 	public Role getRole(){
 		return this.role;

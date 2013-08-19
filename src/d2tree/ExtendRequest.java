@@ -8,12 +8,17 @@ public class ExtendRequest extends MessageBody {
 	
 	private long optimalBucketSize;
 	private long oldOptimalBucketSize;
+	long initialNode;
 	
-    public ExtendRequest(long optimalBucketSize, long oldOptimalBucketSize) {
+    public ExtendRequest(long optimalBucketSize, long oldOptimalBucketSize, long initialNode) {
     	this.optimalBucketSize = optimalBucketSize;
     	this.oldOptimalBucketSize = oldOptimalBucketSize;
+    	this.initialNode = initialNode;
     }
-    
+
+	long getInitialNode(){
+		return initialNode;
+	}
     public long getOptimalBucketSize(){
     	return this.optimalBucketSize;
     }

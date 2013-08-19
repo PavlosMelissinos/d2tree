@@ -8,9 +8,12 @@ public class TransferRequest extends MessageBody {
 	private boolean firstPass;
 	private long destBucket;
 	private long pivotBucket;
-	public TransferRequest(long destBucket, long pivotBucket, boolean firstPass){
+	private long initialNode;
+	
+	public TransferRequest(long destBucket, long pivotBucket, boolean firstPass, long initialNode){
 		this.destBucket = destBucket;
 		this.firstPass = firstPass;
+		this.initialNode = initialNode;
 	}
 	public long getDestBucket(){
 		return this.destBucket;
@@ -20,6 +23,9 @@ public class TransferRequest extends MessageBody {
 	}
 	public boolean isFirstPass(){
 		return this.firstPass;
+	}
+	public long getInitialNode(){
+		return this.initialNode;
 	}
 	@Override
 	public int getType() {
