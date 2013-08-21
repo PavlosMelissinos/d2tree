@@ -80,8 +80,7 @@ public class D2TreeCore {
         
         if (isBucketNode()){
         	if (this.rt.getRightRT().isEmpty()) {//core is the last bucket node of the bucket
-        		Date date = new Date();
-        		String printMsg = date.getTime() + ": Node " + id + " has been added to the bucket of " + rt.getRepresentative() +
+        		String printMsg = "Node " + newNodeId + " has been added to the bucket of " + rt.getRepresentative() +
                 		". Forwarding balance check request to representative with id = " + rt.getRepresentative() + "...";
                 Message msg1 = msg;
                 msg = new Message(id, newNodeId, new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE, initialNode));
@@ -94,7 +93,7 @@ public class D2TreeCore {
                 Vector<Long> rightRT = new Vector<Long>();
                 rightRT.add(rightNeighbor);
                 this.rt.setRightRT(rightRT);
-                msg = new Message(id, rt.getRepresentative(), new CheckBalanceRequest(initialNode));
+                msg = new Message(id, rt.getRepresentative(), new CheckBalanceRequest(msg.getHops(), initialNode));
                 net.sendMsg(msg);
         		
         	}
@@ -744,11 +743,10 @@ public class D2TreeCore {
 			msgData.incrementSize();
 			msg.setData(msgData);
     		if (rightRT.isEmpty()){ //node is last in its bucket
-    			Date date = new Date();
     			//long bucketSize = msg.getHops() - 1;
     			long bucketSize = msgData.getSize();
     			//String printMsg = date.getTime() + ": Node " + this.id + " is the last in its bucket (size = " + msgData.getSize() +
-        		String printMsg = date.getTime() + ": Node " + this.id + " is the last in its bucket (size = " + bucketSize +
+        		String printMsg = "Node " + this.id + " is the last in its bucket (size = " + bucketSize +
     					"). Sending response to its representative, with id " + rt.getRepresentative() + ".";
 		    	this.print(msg, printMsg, msgData.getInitialNode());
                 //msg = new Message(id, msg.getSourceId(), new GetSubtreeSizeResponse(treeSize));
@@ -804,8 +802,7 @@ public class D2TreeCore {
     	String printMsg = "Destination ID = " + destinationID + ". (bucket size = " + data.getSize() + ") Mode = " + mode;
     	if (mode == Mode.MODE_CHECK_BALANCE && this.isLeaf()){
         	this.storedMsgData.put(D2TreeCore.BUCKET_SIZE, givenSize);
-    		Date date = new Date();
-    		printMsg = date.getTime() + ": Node " + this.id + " is a leaf. " + printMsg;
+    		printMsg = "Node " + this.id + " is a leaf. " + printMsg;
     		this.print(msg, printMsg, data.getInitialNode());
     	}
 //    	if (givenSize % 10 == 0){
@@ -851,8 +848,7 @@ public class D2TreeCore {
     	if (mode == Mode.MODE_CHECK_BALANCE && (this.id == destinationID || this.isLeaf())){
 			printMsg = "Node " + id + " is in check balance mode. Destination ID=" + destinationID + ". " + "Doing a check balance request";
     		this.print(msg, printMsg, data.getInitialNode());
-    		if (this.isLeaf()) assert this.id == destinationID;
-    		CheckBalanceRequest newData = new CheckBalanceRequest(data.getInitialNode());
+    		CheckBalanceRequest newData = new CheckBalanceRequest(givenSize, data.getInitialNode());
     		msg.setData(newData);
     		forwardCheckBalanceRequest(msg);
     	}
@@ -910,7 +906,7 @@ public class D2TreeCore {
 				String printMsg = "Node " + this.id +
 		    			" is a leaf. Forwarding balance check request to parent...";
 		    	this.print(msg, printMsg, data.getInitialNode());
-				msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getInitialNode()));
+				msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
 				net.sendMsg(msg);
 			}
 			else{
@@ -929,7 +925,7 @@ public class D2TreeCore {
 				String printMsg = "Node " + this.id +
 		    			" is an unbalanced inner node. Forwarding balance check request to parent...";
 		    	this.print(msg, printMsg, data.getInitialNode());
-				msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getInitialNode()));
+				msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
 				net.sendMsg(msg);
 			}
 			else {
