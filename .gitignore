@@ -13,3 +13,4 @@ src/dummy/
 *.png
 src/p2p/
 d-p2p-sim.log
+reports/D2Tree-sim-1

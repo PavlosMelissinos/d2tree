@@ -140,7 +140,7 @@ public class D2Tree extends Peer {
         pendingQueries++;
         msg = new Message(Id, introducer, new LookupRequest(key));
         Core.forwardLookupRequest(msg);
-        pendingQueries--;
+        //pendingQueries--;
     }
 
     @Override
