@@ -12,6 +12,7 @@ public class TransferRequest extends MessageBody {
 	
 	public TransferRequest(long destBucket, long pivotBucket, boolean firstPass, long initialNode){
 		this.destBucket = destBucket;
+		this.pivotBucket = pivotBucket;
 		this.firstPass = firstPass;
 		this.initialNode = initialNode;
 	}

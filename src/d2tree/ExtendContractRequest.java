@@ -7,10 +7,12 @@ public class ExtendContractRequest extends MessageBody {
 	private static final long serialVersionUID = -671508466340485564L;
 	private long height;
 	private long initialNode;
+	private long totalBucketNodes;
 	
-    public ExtendContractRequest(long height, long initialNode) {
+    public ExtendContractRequest(long totalBucketNodes, long height, long initialNode) {
     	this.height = height;
     	this.initialNode = initialNode;
+    	this.totalBucketNodes = totalBucketNodes;
     }
 
 	long getInitialNode(){
@@ -18,6 +20,9 @@ public class ExtendContractRequest extends MessageBody {
 	}
     long getHeight(){
     	return this.height;
+    }
+    long getTotalBucketNodes(){
+    	return this.totalBucketNodes;
     }
     @Override
     public int getType() {

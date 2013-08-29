@@ -6,6 +6,7 @@
 package d2tree;
 
 import java.io.PrintWriter;
+import java.text.DecimalFormat;
 import java.util.Vector;
 
 /**
@@ -133,18 +134,33 @@ public class RoutingTable {
     	size += rightRT.size();
         return size;
     }
-    long getHeight(){ 
-    	return Math.max(leftRT.size(), rightRT.size());
+    long getHeight(){
+    	return Math.max(leftRT.size(), rightRT.size()) + 1;
     }
     void print(PrintWriter out){
-		out.println("P = " + getParent() +
-				", LC = " + getLeftChild() +
-				", RC = " + getRightChild() +
-				", LA = " + getLeftAdjacentNode() +
-				", RA = " + getRightAdjacentNode() +
-				", LRT = " + getLeftRT() +
-				", RRT = " + getRightRT() +
-				", BN = " + getBucketNode() +
-				", RN = " + getRepresentative());
+//		out.println("P = " + getParent() +
+//				 ", LC = " + getLeftChild() +
+//				 ", RC = " + getRightChild() +
+//				 ", LA = " + getLeftAdjacentNode() +
+//				 ", RA = " + getRightAdjacentNode() +
+//				", LRT = " + getLeftRT() +
+//				", RRT = " + getRightRT() +
+//				 ", BN = " + getBucketNode() +
+//				 ", RN = " + getRepresentative());
+        out.format( "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, LRT = [",
+        		getParent(), getLeftChild(), getRightChild(), getLeftAdjacentNode(), getRightAdjacentNode(),
+        		getBucketNode(), getRepresentative());
+        for (Long node : getLeftRT()){
+        	out.format("%3d ", node);
+        }
+        //if (getLeftRT().isEmpty())  out.print("    ");
+        out.print("], RRT = [");
+        for (Long node : getRightRT()){
+        	out.format("%3d ", node);
+        }
+        //if (getRightRT().isEmpty()) out.print("    ");
+        out.println("]");
+        
+		//out.println(", LRT = " + getLeftRT() + ", RRT = " + getRightRT());
     }
 }
