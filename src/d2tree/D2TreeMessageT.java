@@ -19,6 +19,7 @@ public class D2TreeMessageT extends MessageT {
     static final int TRANSFER_RES         = 1013;
     static final int DISCONNECT_MSG       = 1014;
     static final int PRINT_MSG            = 1015;
+	static final int PRINT_RT_MSG         = 1016;
     
     public static String toString(int msgType){
     	switch(msgType){
@@ -52,6 +53,8 @@ public class D2TreeMessageT extends MessageT {
     		return "DISCONNECT REQUEST";
     	case PRINT_MSG:
     		return "PRINT MESSAGE";
+    	case PRINT_RT_MSG:
+    		return "PRINT RT MESSAGE";
     	default:
     		return "WRONG TYPE";
     	}

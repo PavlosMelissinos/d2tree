@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.security.spec.ECFieldF2m;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -64,8 +63,8 @@ public class D2TreeCore {
         ecData        = new HashMap<Key, Long>();
         //storedMsgData.put(MODE, MODE_NORMAL);
         this.mode = Mode.NORMAL;
-        File logDirFile = new File(logDir);
-        if (!logDirFile.exists()) logDirFile.mkdir();
+        //File logDirFile = new File(logDir);
+        //if (!logDirFile.exists()) logDirFile.mkdir();
     }
 
     /**
@@ -77,12 +76,13 @@ public class D2TreeCore {
     void forwardJoinRequest(Message msg) {
     	assert msg.getData() instanceof JoinRequest;
         long newNodeId = msg.getSourceId();
-        
+
         //DEBUG
         
         if (isBucketNode()){
         	//if (msg.getSourceId() == newNodeId) msg.setSourceId(rt.getRepresentative());
         	if (this.rt.getRightRT().isEmpty()) {//core is the last bucket node of the bucket
+        		int msgType = msg.getType();
         		String printMsg = "Node " + newNodeId + " has been added to the bucket of " + rt.getRepresentative() +
                 		". Forwarding balance check request to representative with id = " + rt.getRepresentative() + "...";
                 ConnectMessage connData = new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE, newNodeId);
@@ -92,15 +92,15 @@ public class D2TreeCore {
             	this.print(msg, printMsg, newNodeId);
 
             	long rightNeighbor = newNodeId;
-                Vector<Long> rightRT = new Vector<Long>();
+                //Vector<Long> rightRT = new Vector<Long>();
+            	Vector<Long> rightRT = this.rt.getRightRT();
                 rightRT.add(rightNeighbor);
                 this.rt.setRightRT(rightRT);
                 long bucketSize = msg.getHops() + 1;
                 msg = new Message(id, rt.getRepresentative(), new CheckBalanceRequest(bucketSize, newNodeId));
                 net.sendMsg(msg);
-                msg = new Message(id, id, new PrintMessage(false, newNodeId));
+                msg = new Message(id, id, new PrintMessage(false, msgType, newNodeId));
                 printTree(msg);
-        		
         	}
             else{ //forward to next bucket node
             	long rNeighborNode = rt.getRightRT().get(0);
@@ -130,12 +130,12 @@ public class D2TreeCore {
         }
         else { //core is an inner node
         	long destination = rt.getLeftAdjacentNode();
-//        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightAdjacentNode();
-//        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftChild();
-//        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightChild();
-//        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftRT().firstElement();
-//        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightRT().firstElement();
-        	destination = Math.random() < 0.5 ? rt.getLeftChild() : rt.getRightChild();
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightAdjacentNode();
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftChild();
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightChild();
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftRT().firstElement();
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightRT().firstElement();
+        	//destination = Math.random() < 0.5 ? rt.getLeftChild() : rt.getRightChild();
     		String printMsg = "Node " + id + " is an inner node. Forwarding request to " + destination + "...";
         	this.print(msg, printMsg, newNodeId);
         	msg.setDestinationId(destination);
@@ -181,9 +181,6 @@ public class D2TreeCore {
 			return;
 		}
 		//We've reached a leaf, so now we need to figure out which buckets to tamper with
-//    	String printMsg = "Node " + id + " is a leaf of the uneven subtree." +
-//    					"Figuring out which buckets to tamper with.";
-//    	this.print(msg, printMsg, data.getInitialNode());
     	Long uncheckedBucketNodes = data.getNoofUncheckedBucketNodes();
     	Long uncheckedBuckets = data.getNoofUncheckedBuckets();
     	if (mode == Mode.NORMAL){
@@ -299,7 +296,7 @@ public class D2TreeCore {
     	if (diff * destDiff >= 0){ //both this bucket and dest have either more or less nodes
     		//TODO not sure what this does
         	String printMsg = "Node " + id + " and destnode " + msg.getSourceId() + " both have too large (or too small) buckets" +
-        			"(" + diff + " and "+ destDiff + " nodes respectively). Forwarding redistribution request to " + msg.getSourceId() + ".(Not sure what this does)";
+        			"(" + diff + " and "+ destDiff + " nodes respectively). Forwarding redistribution request to " + msg.getSourceId() + ".";
         	this.print(msg, printMsg, data.getInitialNode());
     		msg = new Message(id, msg.getSourceId(), new RedistributionRequest(uncheckedBucketNodes, uncheckedBuckets, subtreeID, data.getInitialNode()));
     		net.sendMsg(msg);
@@ -474,7 +471,7 @@ public class D2TreeCore {
 			}
 			printMsg += " Redistribution has been successful. THE END";
 			print(msg, printMsg, transfData.getInitialNode());
-			PrintMessage printData = new PrintMessage(false, transfData.getInitialNode());
+			PrintMessage printData = new PrintMessage(false, msg.getType(), transfData.getInitialNode());
 			printTree(new Message(id, rt.getRepresentative(), printData));
 		}
     }
@@ -569,23 +566,25 @@ public class D2TreeCore {
     	assert msg.getData() instanceof ExtendRequest;
     	ExtendRequest data = (ExtendRequest)msg.getData();
 
-    	//go to the leftmost leaf of the tree, if not already there
+    	//travel to leaves of the tree, if not already there
     	if (!this.isBucketNode()){
     		if (this.isLeaf()){ //forward request to the bucket node
         		String printMsg = "Node " + id + " is a leaf. Forwarding request to bucket node with id = " + rt.getBucketNode() + "...";
-            	//this.print(msg, printMsg, data.getInitialNode());
+            	this.print(msg, printMsg, data.getInitialNode());
         		msg = new Message(msg.getSourceId(), rt.getBucketNode(), (ExtendRequest)msg.getData()); //reset hop count
         		net.sendMsg(msg);
     		}
     		else{ //forward request to the children
         		String printMsg = "Node " + id + " is an inner node. Forwarding request to children with id = "
         				+ rt.getLeftChild() + " and " + rt.getRightChild() + " respectively...";
-            	//this.print(msg, printMsg, data.getInitialNode());
-    			msg.setDestinationId(rt.getLeftChild());
-    			net.sendMsg(msg);
+            	this.print(msg, printMsg, data.getInitialNode());
+    			//msg.setDestinationId(rt.getLeftChild());
+            	Message msg1 = new Message(msg.getSourceId(), rt.getLeftChild(), (ExtendRequest)msg.getData());
+    			net.sendMsg(msg1);
 
-    			msg.setDestinationId(rt.getRightChild());
-    			net.sendMsg(msg);
+    			//msg.setDestinationId(rt.getRightChild());
+    			Message msg2 = new Message(msg.getSourceId(), rt.getRightChild(), (ExtendRequest)msg.getData());
+    			net.sendMsg(msg2);
     		}
     		return;
     	}
@@ -596,6 +595,7 @@ public class D2TreeCore {
     	int counter = msg.getHops();
     	if (rt.getLeftRT().isEmpty()){//this is the first node of the bucket, make it a left leaf
     		String printMsg = "Node " + id + " is the first node of the bucket. Making it a left leaf...";
+    		rt.print(new PrintWriter(System.err));
         	this.print(msg, printMsg, data.getInitialNode());
     		bucketNodeToLeftLeaf(data);
     	}
@@ -633,7 +633,7 @@ public class D2TreeCore {
     		else{
         		String printMsg = "Node " + id + " is the last bucket node. Routing table has been built.";
             	this.print(msg, printMsg, data.getInitialNode());
-            	msg = new Message(id, id, new PrintMessage(false, data.getInitialNode()));
+            	msg = new Message(id, id, new PrintMessage(false, msg.getType(), data.getInitialNode()));
             	printTree(msg);
     		}
     	}
@@ -869,10 +869,9 @@ public class D2TreeCore {
 		//TODO contract
     }
     void forwardGetSubtreeSizeRequest(Message msg){
-    	assert msg.getData() instanceof GetSubtreeSizeRequest;
+		GetSubtreeSizeRequest msgData = (GetSubtreeSizeRequest)msg.getData();
     	if (this.isBucketNode()){
     		Vector<Long> rightRT = rt.getRightRT();
-			GetSubtreeSizeRequest msgData = (GetSubtreeSizeRequest)msg.getData();
 			//TODO Fix bug (forwardGetSubtreeSizeRequest is seemingly called twice for nodes that are last in their buckets)
 			msgData.incrementSize();
 			msg.setData(msgData);
@@ -897,11 +896,26 @@ public class D2TreeCore {
     		}
     	}
     	else if (this.isLeaf()){
-	    	String printMsg = "This is a leaf. Forwarding to bucket node with id "
-	    			+ rt.getBucketNode() + ".";
-	    	//this.print(msg, printMsg);
-    		msg.setDestinationId(rt.getBucketNode());
-    		net.sendMsg(msg);
+    		Long bucketSize = storedMsgData.get(Key.BUCKET_SIZE); 
+    		if (bucketSize == null)
+    		{
+    			String printMsg = "This is a leaf. Forwarding to bucket node with id "
+    				+ rt.getBucketNode() + ".";
+	    		//this.print(msg, printMsg);
+    			msg.setDestinationId(rt.getBucketNode());
+    		}
+    		else{
+    			String printMsg = "This is a leaf with a bucket size of = " + bucketSize +
+    					". Forwarding response to parent with id = " + rt.getRepresentative() + ".";
+    			//this.print(msg, printMsg);
+    			if (rt.getParent() != RoutingTable.DEF_VAL)
+    				msg = new Message(id, id,
+    					new GetSubtreeSizeResponse(bucketSize, msg.getSourceId(), msgData.getInitialNode()));
+    			else
+    				msg = new Message(id, rt.getParent(),
+        				new GetSubtreeSizeResponse(bucketSize, msg.getSourceId(), msgData.getInitialNode()));
+    		}
+			net.sendMsg(msg);
     	}
     	else{
 	    	String printMsg = "This is an inner node. Forwarding to its children with ids "
@@ -930,24 +944,6 @@ public class D2TreeCore {
     	long givenSize = data.getSize();
     	long destinationID = data.getDestinationID();
 
-    	//only deals with leaves
-    	/*else if (mode == Mode.MODE_REDISTRIBUTION && this.isLeaf() && id == destinationID){
-    		//TODO check if this.isLeaf() has to be asserted instead of being a condition
-			printMsg = "Node " + id + " is in redistribution mode.";
-	    	this.print(msg, printMsg);
-			//we've just found out how many nodes this bucket contains so 
-			//we now know if we need to add or remove any nodes from here
-			
-			this.storedMsgData.put(BUCKET_SIZE, givenSize);
-			long uncheckedBucketNodes = this.redistData.get(UNCHECKED_BUCKET_NODES);
-			long subtreeID = this.redistData.get(UNEVEN_SUBTREE_ID);
-			RedistributionRequest redistData = new RedistributionRequest(uncheckedBucketNodes, givenSize, subtreeID);
-			
-			mode = Mode.MODE_TRANSFER;
-			//net.sendMsg(msg);
-			forwardBucketRedistributionRequest(new Message(id, id, redistData));
-			return;
-		}*/
 		//determine what the total size of the node's subtree is
     	//if this is leaf, data.getSize() gives us the size of its bucket, which coincidentally is also the size of its subtree
     	if (!this.isLeaf()){
@@ -988,8 +984,7 @@ public class D2TreeCore {
     		else{
     			String printMsg = "Node " + id + " is not in redistribution mode. Destination ID=" + destinationID + ". Forwarding response to parent...";
         		this.print(msg, printMsg, data.getInitialNode());
-	    		msg.setSourceId(id);
-				msg.setDestinationId(rt.getParent());
+    			msg = new Message(id, rt.getParent(), new GetSubtreeSizeResponse(givenSize, data.getDestinationID(), data.getInitialNode()));
     		}
     		net.sendMsg(msg);
     	}
@@ -1283,45 +1278,72 @@ public class D2TreeCore {
     void printTree(Message msg) {
     	//TODO get to the root and then print downwards
     	PrintMessage data = (PrintMessage)msg.getData();
-    	String logFile = logDir + "main" + data.getInitialNode() + ".log";
-    	System.out.println("Saving log to " + logFile);
-    	if (isRoot())
-    		data = new PrintMessage(true, data.getInitialNode());
-    	if (data.goesDown()){
-    		PrintWriter out = null;
-			try {
-				out = new PrintWriter(new FileWriter(logFile, true));
-	    		out.format("Id = %3d,", id);
-	    		rt.print(out);
-	    		out.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			msg.setData(data);
-    		if(isLeaf()){
-    			msg.setDestinationId(rt.getBucketNode());
-    			net.sendMsg(msg);
-    		}
-    		else if (isBucketNode()){
-    			if (rt.getRightRT().isEmpty()) return;
-    			msg.setDestinationId(rt.getRightRT().get(0));
-    			net.sendMsg(msg);
-    		}
-    		else{
-    			msg = new Message(id, rt.getLeftChild(), data);
-    			//msg.setDestinationId(rt.getLeftChild());
-    			net.sendMsg(msg);
-    			msg = new Message(id, rt.getRightChild(), data);
-    			//msg.setDestinationId(rt.getRightChild());
-    			net.sendMsg(msg);
-    		}
+    	int srcMsgType = data.getSourceType();
+    	if (srcMsgType == D2TreeMessageT.JOIN_REQ){
+        	for (int i = 0; i < data.getInitialNode(); i++){
+        		msg = new Message(id, i + 1, new PrintRTMessage(data.getInitialNode()));
+        		net.sendMsg(msg);
+        	}
     	}
-    	else {
-    		if (this.isBucketNode())
-    			msg.setDestinationId(rt.getRepresentative());
-    		else
-    			msg.setDestinationId(rt.getParent());
-    		net.sendMsg(msg);
+    	else{//if (srcMsgType == D2TreeMessageT.EXTEND_REQ || srcMsgType == D2TreeMessageT.TRANSFER_RES){
+	    	String logFile = logDir + "main" + data.getInitialNode() + ".log";
+	    	String allLogFile = logDir + "main.log";
+	    	System.out.println("Saving log to " + logFile);
+	    	if (isRoot())
+	    		data = new PrintMessage(true, srcMsgType, data.getInitialNode());
+	    	if (data.goesDown()){
+				msg.setData(data);
+	    		if(isLeaf()){
+	    			long destination = rt.getBucketNode();
+	    			if (destination != RoutingTable.DEF_VAL)
+	    				msg.setDestinationId(destination);
+	    			net.sendMsg(msg);
+	    		}
+	    		else if (isBucketNode()){
+	    			if (rt.getRightRT().isEmpty()) return;
+	    			long destination = rt.getRightRT().get(0);
+	    			if (destination != RoutingTable.DEF_VAL)
+	    				msg.setDestinationId(destination);
+	    			net.sendMsg(msg);
+	    		}
+	    		else{
+	    			if (rt.getLeftChild() != RoutingTable.DEF_VAL && rt.getRightChild() != RoutingTable.DEF_VAL){
+	    				msg = new Message(id, rt.getLeftChild(), data);
+	        			//msg.setDestinationId(rt.getLeftChild());
+	        			net.sendMsg(msg);
+	        			
+	        			msg = new Message(id, rt.getRightChild(), data);
+	        			//msg.setDestinationId(rt.getRightChild());
+	        			net.sendMsg(msg);
+	    			}
+	    			else
+	    				net.sendMsg(msg);
+	    		}
+	    		if (msg.getDestinationId() == id) return;
+	    		PrintWriter out = null;
+				try {
+					String msgType = isRoot() ? D2TreeMessageT.toString(data.getSourceType()) + "\n" : "";
+						
+					out = new PrintWriter(new FileWriter(logFile, true));
+		    		out.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(), id);
+		    		rt.print(out);
+		    		out.close();
+	
+					out = new PrintWriter(new FileWriter(allLogFile, true));
+		    		out.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(), id);
+		    		rt.print(out);
+		    		out.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+	    	}
+	    	else {
+	    		if (this.isBucketNode())
+	    			msg.setDestinationId(rt.getRepresentative());
+	    		else
+	    			msg.setDestinationId(rt.getParent());
+	    		net.sendMsg(msg);
+	    	}
     	}
 	}
     boolean isLeaf(){
@@ -1366,10 +1388,26 @@ public class D2TreeCore {
     int getRtSize() {
         return rt.size();
     }
-    long getNodeLevel(){
-    	return Math.max(rt.getLeftRT().size(), rt.getRightRT().size());
+    void printRT(Message msg){
+    	PrintRTMessage data = (PrintRTMessage)msg.getData();
+    	String logFile = logDir + "main" + data.getInitialNode() + ".txt";
+    	String allLogFile = logDir + "main.log";
+    	System.out.println("Saving log to " + logFile);
+		PrintWriter out = null;
+		try {
+			out = new PrintWriter(new FileWriter(logFile, true));
+    		out.format("MID=%3d, Id=%3d,", msg.getMsgId(), id);
+    		rt.print(out);
+    		out.close();
+
+			out = new PrintWriter(new FileWriter(allLogFile, true));
+    		out.format("MID=%3d, Id=%3d,", msg.getMsgId(), id);
+    		rt.print(out);
+    		out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
     }
-    
     /*void print(int msgType, String printMsg){
     	System.out.println(D2TreeMessageT.toString(msgType) +
     			": " + printMsg);
@@ -1377,9 +1415,17 @@ public class D2TreeCore {
     void print(Message msg, String printMsg, long initialNode){
     	try {
         	String logFile = logDir + "state" + initialNode + ".txt";
+        	String allLogFile = logDir + "main.log";
         	System.out.println("Saving log to " + logFile);
-			PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
-	    	out.println("\n" + D2TreeMessageT.toString(msg.getType()) + "(MID = " + msg.getMsgId() +
+            
+        	PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
+            
+            out.println("\n" + D2TreeMessageT.toString(msg.getType()) + "(MID = " + msg.getMsgId() +
+	    			", NID = " + id + ", Initial node = " + initialNode + "): " + printMsg + " Hops = " + msg.getHops());
+	    	out.close();
+	    	
+			out = new PrintWriter(new FileWriter(allLogFile, true));
+			out.println("\n" + D2TreeMessageT.toString(msg.getType()) + "(MID = " + msg.getMsgId() +
 	    			", NID = " + id + ", Initial node = " + initialNode + "): " + printMsg + " Hops = " + msg.getHops());
 	    	out.close();
 		} catch (IOException e) {

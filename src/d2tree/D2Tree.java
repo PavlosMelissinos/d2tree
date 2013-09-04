@@ -87,6 +87,8 @@ public class D2Tree extends Peer {
                 pendingQueries--; break;
             case D2TreeMessageT.PRINT_MSG:
                 Core.printTree(msg); break;
+            case D2TreeMessageT.PRINT_RT_MSG:
+                Core.printRT(msg); break;
             default:
                 System.out.println("Unrecognized message type: "+mType);
         }
