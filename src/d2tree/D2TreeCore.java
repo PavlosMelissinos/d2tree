@@ -653,13 +653,13 @@ public class D2TreeCore {
 		//forward the request to the right neighbor
 		net.sendMsg(new Message(id, rightNeighbor, data));
 		
-		//make this the left child of the old leaf
+		//set this as the left child of the old leaf
 		ConnectMessage connData = new ConnectMessage(this.id, Role.LEFT_CHILD, data.getInitialNode());
 		net.sendMsg(new Message(id, oldLeaf, connData));
 
-		//make this the left adjacent node of the old leaf
-		connData = new ConnectMessage(this.id, Role.LEFT_A_NODE, data.getInitialNode());
-		net.sendMsg(new Message(id, oldLeaf, connData));
+//		//set this as the left adjacent node of the old leaf
+//		connData = new ConnectMessage(this.id, Role.LEFT_A_NODE, data.getInitialNode());
+//		net.sendMsg(new Message(id, oldLeaf, connData));
 
 		//disconnect the bucket node of the old leaf
 		DisconnectMessage discData = new DisconnectMessage(this.id, Role.BUCKET_NODE, data.getInitialNode());
@@ -668,18 +668,10 @@ public class D2TreeCore {
 		//TODO newLeaf.leftAdjacentNode <== oldLeaf.leftAdjacentNode
 		//TODO oldLeaf.leftAdjacentNode.rightAdjacentNode <== newLeaf.leftAdjacentNode
 		
-		//make the old leaf the parent of this node
-		rt.setParent(oldLeaf);
-		
-		//make the old leaf the left adjacent node of this node
-		rt.setRightAdjacentNode(oldLeaf);
-		
-		//disconnect the representative
-		rt.setRepresentative(RoutingTable.DEF_VAL);
-		
-		//make the right neighbor the bucketNode of this node
-		rt.setBucketNode(rightNeighbor);
-		
+		rt.setParent(oldLeaf); //set the old leaf as the parent of this node
+		rt.setRightAdjacentNode(oldLeaf); //set the old leaf as the left adjacent node of this node
+		rt.setRepresentative(RoutingTable.DEF_VAL); //disconnect the representative
+		rt.setBucketNode(rightNeighbor); //set the right neighbor as the bucketNode of this node
 		//empty routing tables
 		rt.setRightRT(new Vector<Long>());
 		rt.setLeftRT(new Vector<Long>());
@@ -696,13 +688,13 @@ public class D2TreeCore {
 		data = new ExtendRequest(data.getOldOptimalBucketSize(), false, data.getInitialNode());
 		net.sendMsg(new Message(id, rightNeighbor, data));
 		
-		//make this the left child of the old leaf
+		//set this as the right child of the old leaf
 		ConnectMessage connData = new ConnectMessage(this.id, Role.RIGHT_CHILD, data.getInitialNode());
 		net.sendMsg(new Message(id, oldLeaf, connData));
 
-		//make this the left adjacent node of the old leaf
-		connData = new ConnectMessage(this.id, Role.RIGHT_A_NODE, data.getInitialNode());
-		net.sendMsg(new Message(id, oldLeaf, connData));
+//		//set this as the right adjacent node of the old leaf
+//		connData = new ConnectMessage(this.id, Role.RIGHT_A_NODE, data.getInitialNode());
+//		net.sendMsg(new Message(id, oldLeaf, connData));
 		
 		//disconnect from left neighbor as right neighbor
 		DisconnectMessage discData = new DisconnectMessage(this.id, Role.RIGHT_NEIGHBOR, data.getInitialNode());
@@ -711,18 +703,10 @@ public class D2TreeCore {
 		//TODO newLeaf.rightAdjacentNode <== oldLeaf.rightAdjacentNode
 		//TODO oldLeaf.rightAdjacentNode.leftAdjacentNode <== newLeaf.rightAdjacentNode
 		
-		//make the old leaf the parent of this node
-		rt.setParent(oldLeaf);
-		
-		//make the old leaf the left adjacent node of this node
-		rt.setLeftAdjacentNode(oldLeaf);
-		
-		//disconnect the representative
-		rt.setRepresentative(RoutingTable.DEF_VAL);
-		
-		//make the right neighbor the bucketNode of this node
-		rt.setBucketNode(rightNeighbor);
-		
+		rt.setParent(oldLeaf); //set the old leaf as the parent of this node
+		rt.setLeftAdjacentNode(oldLeaf); //set the old leaf as the left adjacent node of this node
+		rt.setRepresentative(RoutingTable.DEF_VAL); //disconnect the representative
+		rt.setBucketNode(rightNeighbor); //set the right neighbor as the bucketNode of this node
 		//empty routing tables
 		rt.setRightRT(new Vector<Long>());
 		rt.setLeftRT(new Vector<Long>());
@@ -774,6 +758,9 @@ public class D2TreeCore {
     			msg = new Message(id, lChild, connData);
     			net.sendMsg(msg);
 			}
+			
+			rt.setLeftAdjacentNode(lChild);
+			rt.setRightAdjacentNode(rChild);
 			
 			for (int i = 0; i < rt.getLeftRT().size(); i++){
 				long node = rt.getLeftRT().get(i);
