@@ -10,16 +10,19 @@ public class ConnectMessage extends MessageBody {
 	private long node;
 	private int index;
 	private long initialNode;
-	public ConnectMessage(long node, Role role, long initialNode){
+	private boolean replace;
+	public ConnectMessage(long node, Role role, boolean replace, long initialNode){
 		this.role = role;
 		this.node = node;
 		this.index = 0;
+		this.replace = replace;
 		this.initialNode = initialNode;
 	}
-	public ConnectMessage(long node, Role role, int index, long initialNode){
+	public ConnectMessage(long node, Role role, int index, boolean replace, long initialNode){
 		this.role = role;
 		this.node = node;
 		this.index = index;
+		this.replace = replace;
 		this.initialNode = initialNode;
 	}
 	long getInitialNode(){
@@ -33,6 +36,9 @@ public class ConnectMessage extends MessageBody {
     }
     public int getIndex(){
     	return this.index;
+    }
+    public boolean replaces(){
+    	return this.replace;
     }
     @Override
     public int getType() {

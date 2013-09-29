@@ -15,8 +15,6 @@ public class D2Tree extends Peer {
     private boolean isOnline;
     private int pendingQueries;
     private int introducer;
-    private Logger logger;
-
     @Override
     public void init(long id, long n, long k, Network Net) {
         
@@ -159,7 +157,6 @@ public class D2Tree extends Peer {
 
     @Override
     public void registerLogger(Logger logger) {
-        this.logger = logger;
     }
 
     @Override

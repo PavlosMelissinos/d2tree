@@ -3,6 +3,7 @@ package d2tree;
 import p2p.simulator.message.MessageBody;
 
 public class TransferResponse extends MessageBody {
+	private static final long serialVersionUID = 6862379902007511532L;
 	
 	public enum TransferType{
 		NODE_REMOVED,

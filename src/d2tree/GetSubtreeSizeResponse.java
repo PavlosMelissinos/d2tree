@@ -1,5 +1,6 @@
 package d2tree;
 
+import d2tree.D2TreeCore.Mode;
 import p2p.simulator.message.MessageBody;
 
 public class GetSubtreeSizeResponse extends MessageBody {
@@ -7,12 +8,14 @@ public class GetSubtreeSizeResponse extends MessageBody {
 	private long size;
 	private long finalDestID;
 	private long initialNode;
+	private Mode mode;
 	
 //	public GetSubtreeSizeResponse(long initialNode){
 //		this.size = 0;
 //		this.initialNode = initialNode;
 //	}
-	public GetSubtreeSizeResponse(long size, long finalDestID, long initialNode){
+	public GetSubtreeSizeResponse(Mode mode, long size, long finalDestID, long initialNode){
+		this.mode = mode;
 		this.size = size;
 		this.finalDestID = finalDestID;
 		this.initialNode = initialNode;
@@ -22,6 +25,9 @@ public class GetSubtreeSizeResponse extends MessageBody {
 	}
 	public long getDestinationID(){
 		return this.finalDestID;
+	}
+	public Mode getMode(){
+		return this.mode;
 	}
 	public long getSize(){
 		return this.size;

@@ -6,7 +6,6 @@
 package d2tree;
 
 import java.io.PrintWriter;
-import java.text.DecimalFormat;
 import java.util.Vector;
 
 /**
@@ -60,72 +59,103 @@ public class RoutingTable {
         this.bucketNode = DEF_VAL;
         this.representative = DEF_VAL;
     }
-    
-    void setLeftChild(long lc) {
-        this.leftChild = lc;
+    void set(Role role, int index, long value){
+    	if (value == DEF_VAL) return;
+    	switch (role){
+		case LEFT_RT:
+			while (index >= leftRT.size()) leftRT.add(DEF_VAL);
+    		if (leftRT.get(index) == DEF_VAL)
+				leftRT.set(index, value);
+			break;
+		case RIGHT_RT:
+			while (index >= rightRT.size()) rightRT.add(DEF_VAL);
+    		if (rightRT.get(index) == DEF_VAL)
+				rightRT.set(index, value);
+			break;
+		default:
+			set(role, value);
+    	}
     }
-    
-    long getLeftChild() {
-        return this.leftChild;
+    void set(Role role, long value){
+    	if (value == DEF_VAL) return;
+    	switch (role){
+    	case BUCKET_NODE: 
+			this.bucketNode = value; break;
+		case REPRESENTATIVE:
+	        this.representative = value; break;
+		case LEFT_A_NODE:
+	        this.leftAdjacentNode = value; break;
+		case RIGHT_A_NODE:
+	        this.rightAdjacentNode = value; break;
+		case LEFT_CHILD:
+	        this.leftChild = value; break;
+		case RIGHT_CHILD:
+	        this.rightChild = value; break;
+		case PARENT:
+	        this.parent = value; break;
+		case LEFT_NEIGHBOR:
+			if (!leftRT.isEmpty())
+				leftRT.set(0, value);
+			else
+				leftRT.add(value);
+			break;
+		case RIGHT_NEIGHBOR:
+			if (!rightRT.isEmpty())
+				rightRT.set(0, value);
+			else
+				rightRT.add(value);
+			break;
+		default:
+			break;
+    	}
     }
 
-    void setRightChild(long rc) {
-        this.rightChild = rc;
-    }
-    
-    long getRightChild() {
-        return this.rightChild;
-    }
-
-    void setParent(long p) {
-        this.parent = p;
-    }
-    
-    long getParent() {
-        return this.parent;
-    }
-
-    void setLeftAdjacentNode(long ln) {
-        this.leftAdjacentNode = ln;
-    }
-    
-    long getLeftAdjacentNode() {
-        return this.leftAdjacentNode;
-    }
-
-    void setRightAdjacentNode(long ln) {
-        this.rightAdjacentNode = ln;
-    }
-    
-    long getRightAdjacentNode() {
-        return this.rightAdjacentNode;
-    }
-    
     void setLeftRT(Vector<Long> values) {
     	this.leftRT = values;
     }
-    Vector<Long> getLeftRT() {
-    	return this.leftRT;
-    }
+    
     void setRightRT(Vector<Long> values) {
     	this.rightRT = values;
     }
+
+    long get(Role role){
+    	long value = 0;
+    	switch (role){
+    	case BUCKET_NODE: 
+			value = this.bucketNode; break;
+		case REPRESENTATIVE:
+			value = this.representative; break;
+		case LEFT_A_NODE:
+			value = this.leftAdjacentNode; break;
+		case RIGHT_A_NODE:
+			value = this.rightAdjacentNode; break;
+		case LEFT_CHILD:
+			value = this.leftChild; break;
+		case RIGHT_CHILD:
+			value = this.rightChild; break;
+		case PARENT:
+			value = this.parent; break;
+		case LEFT_NEIGHBOR:
+			value = leftRT.firstElement(); break;
+		case RIGHT_NEIGHBOR:
+			value = rightRT.firstElement(); break;
+		default:
+			try {
+				throw new Exception();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} break;
+    	}
+		return value;
+    }
+    
+    Vector<Long> getLeftRT() {
+        return this.leftRT;
+    }
+    
     Vector<Long> getRightRT() {
-    	return this.rightRT;
-    }
-    
-    void setBucketNode(Long node){
-    	this.bucketNode = node;
-    }
-    long getBucketNode(){
-    	return this.bucketNode;
-    }
-    
-    void setRepresentative(long node){
-    	this.representative = node;
-    }
-    long getRepresentative(){
-    	return this.representative;
+        return this.rightRT;
     }
     
     int size() {
@@ -148,8 +178,8 @@ public class RoutingTable {
 //				 ", BN = " + getBucketNode() +
 //				 ", RN = " + getRepresentative());
         out.format( "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, LRT = [",
-        		getParent(), getLeftChild(), getRightChild(), getLeftAdjacentNode(), getRightAdjacentNode(),
-        		getBucketNode(), getRepresentative());
+        		get(Role.PARENT), get(Role.LEFT_CHILD), get(Role.RIGHT_CHILD), get(Role.LEFT_A_NODE), get(Role.RIGHT_A_NODE),
+        		get(Role.BUCKET_NODE), get(Role.REPRESENTATIVE));
         for (Long node : getLeftRT()){
         	out.format("%3d ", node);
         }

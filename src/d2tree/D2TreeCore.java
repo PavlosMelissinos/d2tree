@@ -1,6 +1,5 @@
 package d2tree;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -15,13 +14,14 @@ import d2tree.TransferResponse.TransferType;
 public class D2TreeCore {
 
 	static final String logDir = "D:\\logs\\";
-	
+	//public static HashMap<Long, D2TreeCore> peers;
+	public static Vector<D2TreeCore> peers;
     private RoutingTable rt;
     private Network net;
     private long id;
     HashMap<Key, Long> storedMsgData;
     HashMap<Key, Long> redistData;
-    HashMap<Key, Long> ecData;
+    private Mode mode;
 	
     static enum Key{
 		LEFT_CHILD_SIZE,
@@ -31,7 +31,6 @@ public class D2TreeCore {
 		BUCKET_SIZE,
 		UNCHECKED_BUCKET_NODES,
 		UNCHECKED_BUCKETS,
-		MODE,
 		DEST;
 	}
     
@@ -48,8 +47,6 @@ public class D2TreeCore {
     		return name;
     	}
     }
-    
-    private Mode mode;
 
     //TODO keep as singleton for simplicity, convert to Vector of keys later
     //private long key;
@@ -60,11 +57,12 @@ public class D2TreeCore {
         this.id       = id;
         storedMsgData = new HashMap<Key, Long>();
         redistData    = new HashMap<Key, Long>();
-        ecData        = new HashMap<Key, Long>();
         //storedMsgData.put(MODE, MODE_NORMAL);
         this.mode = Mode.NORMAL;
         //File logDirFile = new File(logDir);
         //if (!logDirFile.exists()) logDirFile.mkdir();
+        if (peers == null) peers = new Vector<D2TreeCore>();
+        peers.add(this);
     }
 
     /**
@@ -77,18 +75,17 @@ public class D2TreeCore {
     	assert msg.getData() instanceof JoinRequest;
         long newNodeId = msg.getSourceId();
 
-        //DEBUG
         
         if (isBucketNode()){
-        	//if (msg.getSourceId() == newNodeId) msg.setSourceId(rt.getRepresentative());
+        	//if (msg.getSourceId() == newNodeId) msg.setSourceId(rt.get(Role.REPRESENTATIVE));
         	if (this.rt.getRightRT().isEmpty()) {//core is the last bucket node of the bucket
         		int msgType = msg.getType();
-        		String printMsg = "Node " + newNodeId + " has been added to the bucket of " + rt.getRepresentative() +
-                		". Forwarding balance check request to representative with id = " + rt.getRepresentative() + "...";
-                ConnectMessage connData = new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE, newNodeId);
-                net.sendMsg(new Message(id, newNodeId, connData));
-                connData = new ConnectMessage(id, Role.LEFT_NEIGHBOR, newNodeId);
-                net.sendMsg(new Message(id, newNodeId, connData));
+        		String printMsg = "Node " + newNodeId + " has been added to the bucket of " + rt.get(Role.REPRESENTATIVE) +
+                		". Forwarding balance check request to representative with id = " + rt.get(Role.REPRESENTATIVE) + "...";
+                ConnectMessage connData = new ConnectMessage(rt.get(Role.REPRESENTATIVE), Role.REPRESENTATIVE, false, newNodeId);
+                send(new Message(id, newNodeId, connData));
+                connData = new ConnectMessage(id, Role.LEFT_NEIGHBOR, false, newNodeId);
+                send(new Message(id, newNodeId, connData));
             	this.print(msg, printMsg, newNodeId);
 
             	long rightNeighbor = newNodeId;
@@ -97,49 +94,49 @@ public class D2TreeCore {
                 rightRT.add(rightNeighbor);
                 this.rt.setRightRT(rightRT);
                 long bucketSize = msg.getHops() + 1;
-                msg = new Message(id, rt.getRepresentative(), new CheckBalanceRequest(bucketSize, newNodeId));
-                net.sendMsg(msg);
+                msg = new Message(id, rt.get(Role.REPRESENTATIVE), new CheckBalanceRequest(bucketSize, newNodeId));
+                send(msg);
                 msg = new Message(id, id, new PrintMessage(false, msgType, newNodeId));
                 printTree(msg);
         	}
             else{ //forward to next bucket node
             	long rNeighborNode = rt.getRightRT().get(0);
-        		String printMsg = "Node " + id + " is a bucket node. " +
-        				"Forwarding request to right neighbor with id = " + rNeighborNode + "...";
-            	this.print(msg, printMsg, newNodeId);
+//        		String printMsg = "Node " + id + " is a bucket node. " +
+//        				"Forwarding request to right neighbor with id = " + rNeighborNode + "...";
+            	//this.print(msg, printMsg, newNodeId);
             	msg.setDestinationId(rNeighborNode);
-                net.sendMsg(msg);
+                send(msg);
             }
         }
         else if (isLeaf()){
-        	if (rt.getBucketNode() == RoutingTable.DEF_VAL){ //leaf doesn't have a bucket
-        		String printMsg = "Node " + id + " is a bucketless leaf. " +
-        				"Adding " + newNodeId + " as this node's bucket node...";
-            	this.print(msg, printMsg, newNodeId);
-                this.rt.setBucketNode(newNodeId);
-                msg = new Message(id, newNodeId, new ConnectMessage(id, Role.REPRESENTATIVE, newNodeId));
-                net.sendMsg(msg);
+        	if (rt.get(Role.BUCKET_NODE) == RoutingTable.DEF_VAL){ //leaf doesn't have a bucket
+//        		String printMsg = "Node " + id + " is a bucketless leaf. " +
+//        				"Adding " + newNodeId + " as this node's bucket node...";
+            	//this.print(msg, printMsg, newNodeId);
+                this.rt.set(Role.BUCKET_NODE, newNodeId);
+                msg = new Message(id, newNodeId, new ConnectMessage(id, Role.REPRESENTATIVE, false, newNodeId));
+                send(msg);
         	}
         	else{
-        		String printMsg = "Node " + id + " is a leaf. " +
-        				"Forwarding request to its bucket node (id = " + rt.getBucketNode() + ")...";
-            	this.print(msg, printMsg, newNodeId);
-        		msg = new Message(newNodeId, rt.getBucketNode(), new JoinRequest());
-                net.sendMsg(msg);
+//        		String printMsg = "Node " + id + " is a leaf. " +
+//        				"Forwarding request to its bucket node (id = " + rt.get(Role.BUCKET_NODE) + ")...";
+            	//this.print(msg, printMsg, newNodeId);
+        		msg = new Message(newNodeId, rt.get(Role.BUCKET_NODE), new JoinRequest());
+                send(msg);
         	}
         }
         else { //core is an inner node
-        	long destination = rt.getLeftAdjacentNode();
-        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightAdjacentNode();
-        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftChild();
-        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightChild();
-        	if (destination == RoutingTable.DEF_VAL) destination = rt.getLeftRT().firstElement();
-        	if (destination == RoutingTable.DEF_VAL) destination = rt.getRightRT().firstElement();
-        	//destination = Math.random() < 0.5 ? rt.getLeftChild() : rt.getRightChild();
-    		String printMsg = "Node " + id + " is an inner node. Forwarding request to " + destination + "...";
-        	this.print(msg, printMsg, newNodeId);
+        	long destination = rt.get(Role.LEFT_A_NODE);
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.get(Role.RIGHT_A_NODE);
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.get(Role.LEFT_CHILD);
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.get(Role.RIGHT_CHILD);
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.get(Role.LEFT_NEIGHBOR);
+        	if (destination == RoutingTable.DEF_VAL) destination = rt.get(Role.RIGHT_NEIGHBOR);
+        	//destination = Math.random() < 0.5 ? rt.get(Role.LEFT_CHILD) : rt.get(Role.RIGHT_CHILD);
+//    		String printMsg = "Node " + id + " is an inner node. Forwarding request to " + destination + "...";
+        	//this.print(msg, printMsg, newNodeId);
         	msg.setDestinationId(destination);
-            net.sendMsg(msg);
+            send(msg);
         }
     }
 
@@ -155,15 +152,15 @@ public class D2TreeCore {
     	//if this is an inner node, then forward to right child
     	if (!this.isLeaf() && !this.isBucketNode()){
         	String printMsg = "Node " + id +" is an inner node. Forwarding request to " +
-        			rt.getRightChild() + ".";
+        			rt.get(Role.RIGHT_CHILD) + ".";
         	this.print(msg, printMsg, data.getInitialNode());
     		//this.redistData.clear();
     		long noofUncheckedBucketNodes = data.getNoofUncheckedBucketNodes();
     		long noofUncheckedBuckets = 2 * data.getNoofUncheckedBuckets();
     		long subtreeID = data.getSubtreeID();
-    		msg.setDestinationId(rt.getRightChild());
+    		msg.setDestinationId(rt.get(Role.RIGHT_CHILD));
     		msg.setData(new RedistributionRequest(noofUncheckedBucketNodes, noofUncheckedBuckets, subtreeID, data.getInitialNode()));
-    		net.sendMsg(msg);
+    		send(msg);
     		return;
     	}
     	else if (this.isBucketNode()) throw new UnsupportedOperationException("What are you doing here?");
@@ -176,8 +173,8 @@ public class D2TreeCore {
 		if (bucketSize == null){
         	String printMsg = "Node " + id +" is missing bucket info. Computing bucket size...";
         	this.print(msg, printMsg, data.getInitialNode());
-			msg = new Message(id, rt.getBucketNode(), new GetSubtreeSizeRequest(data.getInitialNode()));
-			net.sendMsg(msg);
+			msg = new Message(id, rt.get(Role.BUCKET_NODE), new GetSubtreeSizeRequest(Mode.REDISTRIBUTION, data.getInitialNode()));
+			send(msg);
 			return;
 		}
 		//We've reached a leaf, so now we need to figure out which buckets to tamper with
@@ -217,7 +214,7 @@ public class D2TreeCore {
 			    	this.print(msg, printMsg, data.getInitialNode());
 					redistData.remove(Key.DEST);
 					msg = new Message(id, msg.getSourceId(), msg.getData());
-					net.sendMsg(msg);
+					send(msg);
 					return;
 				}
 				msg.setDestinationId(rt.getLeftRT().get(0));
@@ -233,7 +230,7 @@ public class D2TreeCore {
 				//this.storedMsgData.put(MODE, MODE_TRANSFER);
 				mode = Mode.TRANSFER;
 			}
-    		net.sendMsg(msg);
+    		send(msg);
 		}
 		else if (diff == 0 || (diff == 1 && spareNodes > 0)){//this bucket is ok, so move to the next one (if there is one)
     		long subtreeID = redistData.get(Key.UNEVEN_SUBTREE_ID);
@@ -250,7 +247,7 @@ public class D2TreeCore {
 		    	long totalBucketNodes = diff == 0 ? optimalBucketSize * totalBuckets : (optimalBucketSize - 1) * totalBuckets;
     			ExtendContractRequest ecData = new ExtendContractRequest(totalBucketNodes, rt.getHeight(), data.getInitialNode());
     			msg = new Message(id, subtreeID, ecData);
-    			net.sendMsg(msg);
+    			send(msg);
 //		    	CheckBalanceRequest cbData = new CheckBalanceRequest(bucketSize, data.getInitialNode());
 //    			msg = new Message(id, id, cbData);
 //    			forwardCheckBalanceRequest(msg);
@@ -266,7 +263,7 @@ public class D2TreeCore {
     			if (dest == rt.getLeftRT().get(0))
     				msgData.setTransferDest(RedistributionRequest.DEF_VAL);
     			msg = new Message(id, rt.getLeftRT().get(0), msgData);
-    			net.sendMsg(msg);
+    			send(msg);
     		}
     	}
     	else { //nodes need to be transferred from/to this node)
@@ -275,12 +272,16 @@ public class D2TreeCore {
         	this.print(msg, printMsg, data.getInitialNode());
     		mode = Mode.TRANSFER;
 			if (dest == RedistributionRequest.DEF_VAL){ //this means we've just started the transfer process
-				redistData.put(Key.DEST, rt.getLeftRT().get(0));
+				if (rt.getLeftRT().isEmpty()){
+					new Exception().printStackTrace();
+				}
+				else
+					redistData.put(Key.DEST, rt.getLeftRT().get(0));
     			dest = redistData.get(Key.DEST);
 			}
 			data.setTransferDest(dest);
 			msg = new Message(id, dest, data);
-			net.sendMsg(msg);
+			send(msg);
     	}
     }
     void forwardBucketRedistributionResponse(Message msg){
@@ -296,18 +297,18 @@ public class D2TreeCore {
     	if (diff * destDiff >= 0){ //both this bucket and dest have either more or less nodes
     		//TODO not sure what this does
         	String printMsg = "Node " + id + " and destnode " + msg.getSourceId() + " both have too large (or too small) buckets" +
-        			"(" + diff + " and "+ destDiff + " nodes respectively). Forwarding redistribution request to " + msg.getSourceId() + ".";
+        			"(" + bucketSize + " and "+ data.getDestSize() + " nodes respectively). Forwarding redistribution request to " + msg.getSourceId() + ".";
         	this.print(msg, printMsg, data.getInitialNode());
     		msg = new Message(id, msg.getSourceId(), new RedistributionRequest(uncheckedBucketNodes, uncheckedBuckets, subtreeID, data.getInitialNode()));
-    		net.sendMsg(msg);
+    		send(msg);
     	}
     	else{
     		if (diff > destDiff){ // |pivotBucket| > |destBucket|
     			//move nodes from pivotBucket to destBucket
-            	String printMsg = "Node " + id + " has extra nodes that dest node " + msg.getSourceId() + " can use." +
+            	String printMsg = "Node " + id + " has extra nodes that dest node " + msg.getSourceId() + " can use (" + bucketSize + " vs "+ data.getDestSize() + ")" +
             			" Performing transfer from " + id + " to " + msg.getSourceId() + ".";
             	this.print(msg, printMsg, data.getInitialNode());
-    			msg = new Message(id, rt.getBucketNode(), new TransferRequest(msg.getSourceId(), id, true, data.getInitialNode()));
+    			msg = new Message(id, rt.get(Role.BUCKET_NODE), new TransferRequest(msg.getSourceId(), id, true, data.getInitialNode()));
     		}
     		else{ // |pivotBucket| < |destBucket|
             	String printMsg = "Node " + id + " is missing nodes that dest node " + msg.getSourceId() + " has in abundance." +
@@ -315,7 +316,7 @@ public class D2TreeCore {
             	this.print(msg, printMsg, data.getInitialNode());
             	msg = new Message(id, msg.getSourceId(), new TransferRequest(msg.getSourceId(), id, true, data.getInitialNode()));
     		}
-			net.sendMsg(msg);
+			send(msg);
     	}
     }
     void forwardTransferRequest(Message msg){
@@ -325,20 +326,20 @@ public class D2TreeCore {
     	long destBucket = transfData.getDestBucket();
     	long pivotBucket = transfData.getPivotBucket();
     	if (this.isLeaf()){
-        	String printMsg = "Node " + id + " is a leaf. Forwarding request to bucket node " + rt.getBucketNode() + ".";
+        	String printMsg = "Node " + id + " is a leaf. Forwarding request to bucket node " + rt.get(Role.BUCKET_NODE) + ".";
         	this.print(msg, printMsg, transfData.getInitialNode());
-    		msg.setDestinationId(rt.getBucketNode());
-    		net.sendMsg(msg);
+    		msg.setDestinationId(rt.get(Role.BUCKET_NODE));
+    		send(msg);
     		return;
     	}
     	//this is a bucket node
-		if (!rt.getRightRT().isEmpty() && rt.getRepresentative() != pivotBucket){
+		if (!rt.getRightRT().isEmpty() && rt.get(Role.REPRESENTATIVE) != pivotBucket){
 			//we are at the dest bucket
 			//forward request to right neighbor until we reach the last node in the bucket
         	String printMsg = "Node " + id + " is a bucket node of dest. Forwarding request to right neighbor " + rt.getRightRT().get(0) + ".";
         	this.print(msg, printMsg, transfData.getInitialNode());
     		msg.setDestinationId(rt.getRightRT().get(0));
-    		net.sendMsg(msg);
+    		send(msg);
     		return;
 		}
 		if (rt.getRightRT().isEmpty()){
@@ -352,13 +353,13 @@ public class D2TreeCore {
 		//or the first node of the pivot bucket
 		if (isFirstPass){
         	String printMsg = "Performing first-pass transfer ";
-			if (rt.getRepresentative() != pivotBucket){
+			if (rt.get(Role.REPRESENTATIVE) != pivotBucket){
 				//move this node from the dest bucket to pivot (as first pass)
 				printMsg += "from " + destBucket + " to " + pivotBucket;
 	        	this.print(msg, printMsg, transfData.getInitialNode());
 				//remove the link from the left neighbor to this node
 				msg = new Message(id, rt.getLeftRT().get(0), new DisconnectMessage(id, Role.RIGHT_NEIGHBOR, transfData.getInitialNode()));
-				net.sendMsg(msg);
+				send(msg);
 				
 				//remove the link from this node to its left neighbor
 				rt.setLeftRT(new Vector<Long>());
@@ -366,7 +367,7 @@ public class D2TreeCore {
 				//send message to the pivot bucket with the new node
 				transfData = new TransferRequest(destBucket, pivotBucket, false, transfData.getInitialNode());
 				msg = new Message(id, pivotBucket, transfData);
-				net.sendMsg(msg);
+				send(msg);
 			}
 			else{
 				//move this node from the pivot bucket to dest (as first pass)
@@ -374,7 +375,7 @@ public class D2TreeCore {
 	        	this.print(msg, printMsg, transfData.getInitialNode());
 				//remove the link from the right neighbor to this node
 				msg = new Message(id, rt.getRightRT().get(0), new DisconnectMessage(id, Role.LEFT_NEIGHBOR, transfData.getInitialNode()));
-				net.sendMsg(msg);
+				send(msg);
 				
 				//remove the link from this node to its left neighbor
 				rt.setRightRT(new Vector<Long>());
@@ -382,12 +383,12 @@ public class D2TreeCore {
 				//send message to the dest bucket with the new node
 				transfData = new TransferRequest(destBucket, pivotBucket, false, transfData.getInitialNode());
 				msg = new Message(id, destBucket, transfData);
-				net.sendMsg(msg);
+				send(msg);
 			}
 		}
 		else{ //second pass
         	String printMsg = "Performing second-pass transfer of " + msg.getSourceId() + " from ";
-			if (rt.getRepresentative() != pivotBucket){
+			if (rt.get(Role.REPRESENTATIVE) != pivotBucket){
 				//move pivotNode from the pivot bucket to dest (as second pass)
 				printMsg += pivotBucket + " to " + destBucket;
 	        	this.print(msg, printMsg, transfData.getInitialNode());
@@ -395,33 +396,33 @@ public class D2TreeCore {
 				long pivotNode = msg.getSourceId();
 				
 				//add a link from pivotNode to the representative of destNode
-//				printMsg = "Setting " + rt.getRepresentative() + " as the representative of node " + pivotNode + "...";
+//				printMsg = "Setting " + rt.get(Role.REPRESENTATIVE) + " as the representative of node " + pivotNode + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				ConnectMessage connData = new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE, transfData.getInitialNode());
+				ConnectMessage connData = new ConnectMessage(rt.get(Role.REPRESENTATIVE), Role.REPRESENTATIVE, true, transfData.getInitialNode());
 				msg = new Message(id, pivotNode, connData);
-				net.sendMsg(msg);				
+				send(msg);				
 				
 				//add a link from pivotNode to destNode
 //				printMsg = "Setting " + id + " as the left neighbor of node " + pivotNode + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				connData = new ConnectMessage(id, Role.LEFT_NEIGHBOR, transfData.getInitialNode());
+				connData = new ConnectMessage(id, Role.LEFT_NEIGHBOR, true, transfData.getInitialNode());
 				msg = new Message(id, pivotNode, connData);
-				net.sendMsg(msg);
+				send(msg);
 				
 				//add a link from destNode to pivotNode
 //				printMsg = "Setting " + pivotNode + " as the right neighbor of node " + id + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				connData = new ConnectMessage(pivotNode, Role.RIGHT_NEIGHBOR, transfData.getInitialNode());
+				connData = new ConnectMessage(pivotNode, Role.RIGHT_NEIGHBOR, true, transfData.getInitialNode());
 				msg = new Message(id, id, connData);
 				connect(msg);
 				
 				TransferResponse respData = new TransferResponse(TransferType.NODE_REMOVED, pivotBucket, transfData.getInitialNode());
 				msg = new Message(id, pivotBucket, respData);
-				net.sendMsg(msg);
+				send(msg);
 
 				respData = new TransferResponse(TransferType.NODE_ADDED, pivotBucket, transfData.getInitialNode());
 				msg = new Message(id, destBucket, respData);
-				net.sendMsg(msg);
+				send(msg);
 				
 				printMsg = "Successfully moved " + pivotNode + " next to " + id + "...";
 			}
@@ -433,46 +434,46 @@ public class D2TreeCore {
 				long destNode = msg.getSourceId();
 				
 				//add a link from destNode to pivotNode's representative
-//				printMsg = "Setting " + rt.getRepresentative() + " as the representative of node " + destNode + "...";
+//				printMsg = "Setting " + rt.get(Role.REPRESENTATIVE) + " as the representative of node " + destNode + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				ConnectMessage connData = new ConnectMessage(rt.getRepresentative(), Role.REPRESENTATIVE, transfData.getInitialNode());
+				ConnectMessage connData = new ConnectMessage(rt.get(Role.REPRESENTATIVE), Role.REPRESENTATIVE, true, transfData.getInitialNode());
 				msg = new Message(id, destNode, connData);
-				net.sendMsg(msg);
+				send(msg);
 				
 				//add a link from pivotNode's representative to destNode
-//				printMsg = "Setting " + destNode + " as the bucket node of node " + rt.getRepresentative() + "...";
+//				printMsg = "Setting " + destNode + " as the bucket node of node " + rt.get(Role.REPRESENTATIVE) + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				connData = new ConnectMessage(destNode, Role.BUCKET_NODE, transfData.getInitialNode());
-				msg = new Message(id, rt.getRepresentative(), connData);
-				net.sendMsg(msg);
+				connData = new ConnectMessage(destNode, Role.BUCKET_NODE, true, transfData.getInitialNode());
+				msg = new Message(id, rt.get(Role.REPRESENTATIVE), connData);
+				send(msg);
 				
 				//add a link from pivotNode to destNode
 //				printMsg = "Setting " + destNode + " as the left neighbor of node " + id + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				connData = new ConnectMessage(destNode, Role.LEFT_NEIGHBOR, transfData.getInitialNode());
+				connData = new ConnectMessage(destNode, Role.LEFT_NEIGHBOR, true, transfData.getInitialNode());
 				msg = new Message(id, id, connData);
 				connect(msg);
 				
 				//add a link from destNode to pivotNode
 //				printMsg = "Setting " + id + " as the right neighbor of node " + destNode + "...";
 //	        	this.print(msg, printMsg, transfData.getInitialNode());
-				connData = new ConnectMessage(id, Role.RIGHT_NEIGHBOR, transfData.getInitialNode());
+				connData = new ConnectMessage(id, Role.RIGHT_NEIGHBOR, true, transfData.getInitialNode());
 				msg = new Message(id, destNode, connData);
-				net.sendMsg(msg);
+				send(msg);
 
 				TransferResponse respData = new TransferResponse(TransferType.NODE_ADDED, pivotBucket, transfData.getInitialNode());
 				msg = new Message(id, pivotBucket, respData);
-				net.sendMsg(msg);
+				send(msg);
 				
 				respData = new TransferResponse(TransferType.NODE_REMOVED, pivotBucket, transfData.getInitialNode());
 				msg = new Message(id, destBucket, respData);
-				net.sendMsg(msg);
+				send(msg);
 				printMsg = "Successfully moved " + destNode + " next to " + id + "...";
 			}
 			printMsg += " Redistribution has been successful. THE END";
 			print(msg, printMsg, transfData.getInitialNode());
 			PrintMessage printData = new PrintMessage(false, msg.getType(), transfData.getInitialNode());
-			//printTree(new Message(id, rt.getRepresentative(), printData));
+			//printTree(new Message(id, rt.get(Role.REPRESENTATIVE), printData));
 			printTree(new Message(id, id, printData));
 		}
     }
@@ -496,13 +497,13 @@ public class D2TreeCore {
 				print(msg, printMsg, data.getInitialNode());
     			RedistributionResponse rData = new RedistributionResponse(bucketSize, data.getInitialNode());
     			msg = new Message(id, pivotBucket, rData);
-    			net.sendMsg(msg);
+    			send(msg);
     		}
     	}
 //    	long unevenSubtreeID = redistData.get(D2TreeCore.UNEVEN_SUBTREE_ID);
 //    	if (unevenSubtreeID != id){
 //    		msg.setDestinationId(unevenSubtreeID);
-//    		net.sendMsg(msg);
+//    		send(msg);
 //    	}
 //    	if (this.isRoot()){
 //    		TransferResponse data = (TransferResponse)msg.getData();
@@ -516,8 +517,8 @@ public class D2TreeCore {
     	assert msg.getData() instanceof ExtendContractRequest;
     	if (!this.isRoot()){//We only extend and contract if the root was uneven.
     		if (!this.isBucketNode()){
-    			msg.setDestinationId(rt.getParent());
-    			net.sendMsg(msg);
+    			msg.setDestinationId(rt.get(Role.PARENT));
+    			send(msg);
     		}
 			return;
     	}
@@ -525,12 +526,8 @@ public class D2TreeCore {
     	ExtendContractRequest data = (ExtendContractRequest)msg.getData();
     	
     	long treeHeight = data.getHeight();
-    	//long pbtSize = (treeHeight + 1) * (treeHeight + 1) - 1;
-    	long pbtSize = (long)Math.pow(2, treeHeight) - 1;
     	long totalBucketNodes = data.getTotalBucketNodes();
     	long totalBuckets = new Double(Math.pow(2, data.getHeight() - 1)).longValue();
-    	long subtreeSize = pbtSize + totalBucketNodes;
-    	//double optimalBucketSize  = Math.log(subtreeSize) / Math.log(2);
     	double averageBucketSize = (double)totalBucketNodes / (double)totalBuckets;
     	double factor = 2.0;
     	double offset = 4.0;
@@ -545,7 +542,7 @@ public class D2TreeCore {
     		//ExtendRequest eData = new ExtendRequest(Math.round(optimalBucketSize), (long)averageBucketSize, data.getInitialNode());
     		ExtendRequest eData = new ExtendRequest((long)averageBucketSize, true, data.getInitialNode());
     		msg = new Message(id, id, eData);
-        	net.sendMsg(msg);
+        	send(msg);
     	}
     	else if (shouldContract && !this.isLeaf()){
     		printMsg += "Initiating tree contraction.";
@@ -553,7 +550,7 @@ public class D2TreeCore {
         	//ContractRequest cData = new ContractRequest(Math.round(optimalBucketSize), data.getInitialNode());
         	ContractRequest cData = new ContractRequest((long)averageBucketSize, data.getInitialNode());
     		msg = new Message(id, id, cData);
-        	net.sendMsg(msg);
+        	send(msg);
     	}
     	else if (shouldContract && this.isLeaf()){
     		printMsg += "Tree is already at minimum height. Can't contract any more.";
@@ -568,28 +565,29 @@ public class D2TreeCore {
     void forwardExtendRequest(Message msg){
     	assert msg.getData() instanceof ExtendRequest;
     	ExtendRequest data = (ExtendRequest)msg.getData();
+		long initialNode = data.getInitialNode();
 
     	//travel to leaves of the tree, if not already there
     	if (!this.isBucketNode()){
     		if (this.isLeaf()){ //forward request to the bucket node
     			Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
-        		String printMsg = "Node " + id + " is a leaf with size = " + bucketSize + ". Forwarding request to bucket node with id = " + rt.getBucketNode() + "...";
-            	this.print(msg, printMsg, data.getInitialNode());
-            	data = new ExtendRequest(bucketSize, true, data.getInitialNode());
-        		msg = new Message(msg.getSourceId(), rt.getBucketNode(), data); //reset hop count
-        		net.sendMsg(msg);
+        		String printMsg = "Node " + id + " is a leaf with size = " + bucketSize + ". Forwarding request to bucket node with id = " + rt.get(Role.BUCKET_NODE) + "...";
+            	this.print(msg, printMsg, initialNode);
+            	data = new ExtendRequest(bucketSize, true, initialNode);
+        		msg = new Message(msg.getSourceId(), rt.get(Role.BUCKET_NODE), data); //reset hop count
+        		send(msg);
     		}
     		else{ //forward request to the children
         		String printMsg = "Node " + id + " is an inner node. Forwarding request to children with id = "
-        				+ rt.getLeftChild() + " and " + rt.getRightChild() + " respectively...";
+        				+ rt.get(Role.LEFT_CHILD) + " and " + rt.get(Role.RIGHT_CHILD) + " respectively...";
             	this.print(msg, printMsg, data.getInitialNode());
-    			//msg.setDestinationId(rt.getLeftChild());
-            	Message msg1 = new Message(msg.getSourceId(), rt.getLeftChild(), (ExtendRequest)msg.getData());
-    			net.sendMsg(msg1);
+    			//msg.setDestinationId(rt.get(Role.LEFT_CHILD));
+            	Message msg1 = new Message(msg.getSourceId(), rt.get(Role.LEFT_CHILD), (ExtendRequest)msg.getData());
+    			send(msg1);
 
-    			//msg.setDestinationId(rt.getRightChild());
-    			Message msg2 = new Message(msg.getSourceId(), rt.getRightChild(), (ExtendRequest)msg.getData());
-    			net.sendMsg(msg2);
+    			//msg.setDestinationId(rt.get(Role.RIGHT_CHILD));
+    			Message msg2 = new Message(msg.getSourceId(), rt.get(Role.RIGHT_CHILD), (ExtendRequest)msg.getData());
+    			send(msg2);
     		}
     		return;
     	}
@@ -600,7 +598,7 @@ public class D2TreeCore {
     	//long optimalBucketSize = data.getOptimalBucketSize();
     	int counter = msg.getHops();
     	if (rt.getLeftRT().isEmpty()){//this is the first node of the bucket, make it a left leaf
-    		String printMsg = "Node " + id + " is the first node of bucket " + rt.getRepresentative() + " (index = "+counter+"). Making it a left leaf...";
+    		String printMsg = "Node " + id + " is the first node of bucket " + rt.get(Role.REPRESENTATIVE) + " (index = "+counter+"). Making it a left leaf...";
     		rt.print(new PrintWriter(System.err));
         	this.print(msg, printMsg, data.getInitialNode());
     		bucketNodeToLeftLeaf(data);
@@ -609,24 +607,24 @@ public class D2TreeCore {
     		//forward extend response to the old leaf
     		long leftLeaf = msg.getSourceId();
     		long rightLeaf = id;
-    		long oldLeaf = rt.getRepresentative();
+    		long oldLeaf = rt.get(Role.REPRESENTATIVE);
     		
     		//the left bucket is full, forward a new extend request to the new (left) leaf
 
-    		String printMsg = "Node " + id + " is the middle node of bucket "+rt.getRepresentative()+" (index = "+counter+"). Left leaf is the node with id = " +
+    		String printMsg = "Node " + id + " is the middle node of bucket "+rt.get(Role.REPRESENTATIVE)+" (index = "+counter+"). Left leaf is the node with id = " +
     				leftLeaf + " (bucket size = " + (counter - 1) + ") and the old leaf has id = " + oldLeaf + ". Making " + id + " a right leaf...";
         	this.print(msg, printMsg, data.getInitialNode());
 
         	ExtendResponse exData = new ExtendResponse(0, leftLeaf, rightLeaf, data.getInitialNode());
     		msg = new Message(id, oldLeaf, exData);
-    		net.sendMsg(msg);
+    		send(msg);
     		
     		bucketNodeToRightLeaf(data);
     	}
     	else{
-    		long oldLeaf = rt.getRepresentative();
+    		long oldLeaf = rt.get(Role.REPRESENTATIVE);
     		long newLeaf = msg.getSourceId();
-    		rt.setRepresentative(newLeaf);
+    		rt.set(Role.REPRESENTATIVE, newLeaf);
     		if (rt.getLeftRT().get(0) == newLeaf) //this is the first node of the new bucket
     			rt.setLeftRT(new Vector<Long>()); //disconnect from newLeaf
     		
@@ -635,7 +633,7 @@ public class D2TreeCore {
             	this.print(msg, printMsg, data.getInitialNode());
 	    		//forward to next bucket node
 	    		msg.setDestinationId(rt.getRightRT().get(0));
-	    		net.sendMsg(msg);
+	    		send(msg);
     		}
     		else{
         		String printMsg = "Node " + id + " is the last node of ex-bucket " + oldLeaf+". Routing table has been built.";
@@ -647,31 +645,31 @@ public class D2TreeCore {
     }
 
 	void bucketNodeToLeftLeaf(ExtendRequest data){
-		long oldLeaf = rt.getRepresentative();
+		long oldLeaf = rt.get(Role.REPRESENTATIVE);
 		long rightNeighbor = rt.getRightRT().get(0);
 		
 		//forward the request to the right neighbor
-		net.sendMsg(new Message(id, rightNeighbor, data));
+		send(new Message(id, rightNeighbor, data));
 		
 		//set this as the left child of the old leaf
-		ConnectMessage connData = new ConnectMessage(this.id, Role.LEFT_CHILD, data.getInitialNode());
-		net.sendMsg(new Message(id, oldLeaf, connData));
+		ConnectMessage connData = new ConnectMessage(this.id, Role.LEFT_CHILD, true, data.getInitialNode());
+		send(new Message(id, oldLeaf, connData));
 
 //		//set this as the left adjacent node of the old leaf
 //		connData = new ConnectMessage(this.id, Role.LEFT_A_NODE, data.getInitialNode());
-//		net.sendMsg(new Message(id, oldLeaf, connData));
+//		send(new Message(id, oldLeaf, connData));
 
 		//disconnect the bucket node of the old leaf
 		DisconnectMessage discData = new DisconnectMessage(this.id, Role.BUCKET_NODE, data.getInitialNode());
-		net.sendMsg(new Message(id, oldLeaf, discData));
+		send(new Message(id, oldLeaf, discData));
 		
 		//TODO newLeaf.leftAdjacentNode <== oldLeaf.leftAdjacentNode
 		//TODO oldLeaf.leftAdjacentNode.rightAdjacentNode <== newLeaf.leftAdjacentNode
 		
-		rt.setParent(oldLeaf); //set the old leaf as the parent of this node
-		rt.setRightAdjacentNode(oldLeaf); //set the old leaf as the left adjacent node of this node
-		rt.setRepresentative(RoutingTable.DEF_VAL); //disconnect the representative
-		rt.setBucketNode(rightNeighbor); //set the right neighbor as the bucketNode of this node
+		rt.set(Role.PARENT, oldLeaf); //set the old leaf as the parent of this node
+		rt.set(Role.RIGHT_A_NODE, oldLeaf); //set the old leaf as the left adjacent node of this node
+		rt.set(Role.REPRESENTATIVE, RoutingTable.DEF_VAL); //disconnect the representative
+		rt.set(Role.BUCKET_NODE, rightNeighbor); //set the right neighbor as the bucketNode of this node
 		//empty routing tables
 		rt.setRightRT(new Vector<Long>());
 		rt.setLeftRT(new Vector<Long>());
@@ -681,32 +679,32 @@ public class D2TreeCore {
     	this.print(new Message(id, id, data), printMsg, data.getInitialNode());
     }
     void bucketNodeToRightLeaf(ExtendRequest data){
-		long oldLeaf = rt.getRepresentative();
+		long oldLeaf = rt.get(Role.REPRESENTATIVE);
 		long rightNeighbor = rt.getRightRT().get(0);
 		
 		//forward the request to the right neighbor
 		data = new ExtendRequest(data.getOldOptimalBucketSize(), false, data.getInitialNode());
-		net.sendMsg(new Message(id, rightNeighbor, data));
+		send(new Message(id, rightNeighbor, data));
 		
 		//set this as the right child of the old leaf
-		ConnectMessage connData = new ConnectMessage(this.id, Role.RIGHT_CHILD, data.getInitialNode());
-		net.sendMsg(new Message(id, oldLeaf, connData));
+		ConnectMessage connData = new ConnectMessage(this.id, Role.RIGHT_CHILD, true, data.getInitialNode());
+		send(new Message(id, oldLeaf, connData));
 
 //		//set this as the right adjacent node of the old leaf
 //		connData = new ConnectMessage(this.id, Role.RIGHT_A_NODE, data.getInitialNode());
-//		net.sendMsg(new Message(id, oldLeaf, connData));
+//		send(new Message(id, oldLeaf, connData));
 		
 		//disconnect from left neighbor as right neighbor
 		DisconnectMessage discData = new DisconnectMessage(this.id, Role.RIGHT_NEIGHBOR, data.getInitialNode());
-		net.sendMsg(new Message(id, rt.getLeftRT().get(0), discData));
+		send(new Message(id, rt.getLeftRT().get(0), discData));
 		
 		//TODO newLeaf.rightAdjacentNode <== oldLeaf.rightAdjacentNode
 		//TODO oldLeaf.rightAdjacentNode.leftAdjacentNode <== newLeaf.rightAdjacentNode
 		
-		rt.setParent(oldLeaf); //set the old leaf as the parent of this node
-		rt.setLeftAdjacentNode(oldLeaf); //set the old leaf as the left adjacent node of this node
-		rt.setRepresentative(RoutingTable.DEF_VAL); //disconnect the representative
-		rt.setBucketNode(rightNeighbor); //set the right neighbor as the bucketNode of this node
+		rt.set(Role.PARENT, oldLeaf); //set the old leaf as the parent of this node
+		rt.set(Role.LEFT_A_NODE, oldLeaf); //set the old leaf as the left adjacent node of this node
+		rt.set(Role.REPRESENTATIVE, RoutingTable.DEF_VAL); //disconnect the representative
+		rt.set(Role.BUCKET_NODE, rightNeighbor); //set the right neighbor as the bucketNode of this node
 		//empty routing tables
 		rt.setRightRT(new Vector<Long>());
 		rt.setLeftRT(new Vector<Long>());
@@ -720,141 +718,142 @@ public class D2TreeCore {
     	assert msg.getData() instanceof ExtendResponse;
     	ExtendResponse data = (ExtendResponse)msg.getData();
     	int index = data.getIndex();
-    	long lChild = data.getLeftChild();
-    	long rChild = data.getRightChild();
+    	long lChild0 = data.getLeftChild();
+    	long rChild0 = data.getRightChild();
     	if (index == 0){
-    		if (rt.getLeftAdjacentNode() != RoutingTable.DEF_VAL && rt.getLeftAdjacentNode() != lChild){ //add a link from left adjacent to left child
-    			ConnectMessage connData = new ConnectMessage(lChild, Role.RIGHT_A_NODE, data.getInitialNode());
-    			msg = new Message(id, rt.getLeftAdjacentNode(), connData);
-    			net.sendMsg(msg);
+    		if (rt.get(Role.LEFT_A_NODE) != RoutingTable.DEF_VAL && rt.get(Role.LEFT_A_NODE) != lChild0){ //add a link from left adjacent to left child
+    			ConnectMessage connData = new ConnectMessage(lChild0, Role.RIGHT_A_NODE, true, data.getInitialNode());
+    			msg = new Message(id, rt.get(Role.LEFT_A_NODE), connData);
+    			send(msg);
     		}
 			
-    		if (lChild != RoutingTable.DEF_VAL && rt.getLeftAdjacentNode() != lChild){ //add a link from left child to left adjacent
-    			ConnectMessage connData = new ConnectMessage(rt.getLeftAdjacentNode(), Role.LEFT_A_NODE, data.getInitialNode());
-				msg = new Message(id, lChild, connData);
-				net.sendMsg(msg);
+    		if (lChild0 != RoutingTable.DEF_VAL && rt.get(Role.LEFT_A_NODE) != lChild0){ //add a link from left child to left adjacent
+    			ConnectMessage connData = new ConnectMessage(rt.get(Role.LEFT_A_NODE), Role.LEFT_A_NODE, true, data.getInitialNode());
+				msg = new Message(id, lChild0, connData);
+				send(msg);
     		}
 	    	
-    		if (rt.getRightAdjacentNode() != RoutingTable.DEF_VAL && rt.getRightAdjacentNode() != rChild){ //add a link from right adjacent to right child
-    			ConnectMessage connData = new ConnectMessage(rChild, Role.LEFT_A_NODE, data.getInitialNode());
-				msg = new Message(id, rt.getRightAdjacentNode(), connData);
-				net.sendMsg(msg);
+    		if (rt.get(Role.RIGHT_A_NODE) != RoutingTable.DEF_VAL && rt.get(Role.RIGHT_A_NODE) != rChild0){ //add a link from right adjacent to right child
+    			ConnectMessage connData = new ConnectMessage(rChild0, Role.LEFT_A_NODE, true, data.getInitialNode());
+				msg = new Message(id, rt.get(Role.RIGHT_A_NODE), connData);
+				send(msg);
     		}
 			
-    		if (rChild != RoutingTable.DEF_VAL && rt.getRightAdjacentNode() != rChild){ //add a link from right child to right adjacent
-    			ConnectMessage connData = new ConnectMessage(rt.getRightAdjacentNode(), Role.RIGHT_A_NODE, data.getInitialNode());
-				msg = new Message(id, rChild, connData);
-				net.sendMsg(msg);
+    		if (rChild0 != RoutingTable.DEF_VAL && rt.get(Role.RIGHT_A_NODE) != rChild0){ //add a link from right child to right adjacent
+    			ConnectMessage connData = new ConnectMessage(rt.get(Role.RIGHT_A_NODE), Role.RIGHT_A_NODE, true, data.getInitialNode());
+				msg = new Message(id, rChild0, connData);
+				send(msg);
     		}
 
-			if (rChild != RoutingTable.DEF_VAL){ //add a link from right child to left child
-    			ConnectMessage connData = new ConnectMessage(lChild, Role.LEFT_NEIGHBOR, data.getInitialNode());
-    			msg = new Message(id, rChild, connData);
-    			net.sendMsg(msg);
+			if (rChild0 != RoutingTable.DEF_VAL){ //add a link from right child to left child
+    			ConnectMessage connData = new ConnectMessage(lChild0, Role.LEFT_NEIGHBOR, true, data.getInitialNode());
+    			msg = new Message(id, rChild0, connData);
+    			send(msg);
 			}
 			
-			if (lChild != RoutingTable.DEF_VAL){ //add a link from left child to right child
-				ConnectMessage connData = new ConnectMessage(rChild, Role.RIGHT_NEIGHBOR, data.getInitialNode());
-    			msg = new Message(id, lChild, connData);
-    			net.sendMsg(msg);
+			if (lChild0 != RoutingTable.DEF_VAL){ //add a link from left child to right child
+				ConnectMessage connData = new ConnectMessage(rChild0, Role.RIGHT_NEIGHBOR, true, data.getInitialNode());
+    			msg = new Message(id, lChild0, connData);
+    			send(msg);
 			}
 			
-			rt.setLeftAdjacentNode(lChild);
-			rt.setRightAdjacentNode(rChild);
+			rt.set(Role.LEFT_A_NODE, lChild0);
+			rt.set(Role.RIGHT_A_NODE, rChild0);
 			
 			for (int i = 0; i < rt.getLeftRT().size(); i++){
 				long node = rt.getLeftRT().get(i);
-				data = new ExtendResponse(-i - 1, lChild, rChild, data.getInitialNode());
-				msg.setData(data);
-				msg.setDestinationId(node);
-				net.sendMsg(msg);
+				data = new ExtendResponse(-i - 1, lChild0, rChild0, data.getInitialNode());
+				msg = new Message(msg.getSourceId(), node, data);
+				send(msg);
 			}
 			for (int i = 0; i < rt.getRightRT().size(); i++){
 				long node = rt.getRightRT().get(i);
-				data = new ExtendResponse(i + 1, lChild, rChild, data.getInitialNode());
-				msg.setData(data);
-				msg.setDestinationId(node);
-				net.sendMsg(msg);
+				data = new ExtendResponse(i + 1, lChild0, rChild0, data.getInitialNode());
+				msg = new Message(msg.getSourceId(), node, data);
+				send(msg);
 			}
 			//TODO forward extend requests to the new leaves if their size is not optimal
 			//ExtendRequest exData = new ExtendRequest(ecData.get(D2TreeCore.), );
     	}
     	else{
+    		long lChildi = rt.get(Role.LEFT_CHILD);
+    		long rChildi = rt.get(Role.RIGHT_CHILD);
     		if (index < 0 ){ //old leaf's left RT
         		if (index == -1){ //this is the left neighbor of the old leaf
         			
-        			if (rt.getRightChild() != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original left child
-	        			ConnectMessage connData = new ConnectMessage(lChild, Role.RIGHT_NEIGHBOR, data.getInitialNode());
-	        			msg = new Message(id, rt.getRightChild(), connData);
-	        			net.sendMsg(msg);
+        			if (rChildi != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original left child
+	        			ConnectMessage connData = new ConnectMessage(lChild0, Role.RIGHT_NEIGHBOR, true, data.getInitialNode());
+	        			msg = new Message(id, rChildi, connData);
+	        			send(msg);
         			}
         			
-        			if (lChild != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's right child
-        				ConnectMessage connData = new ConnectMessage(rt.getRightChild(), Role.LEFT_NEIGHBOR, data.getInitialNode());
-	        			msg = new Message(id, lChild, connData);
-	        			net.sendMsg(msg);
+        			if (lChild0 != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's right child
+        				ConnectMessage connData = new ConnectMessage(rChildi, Role.LEFT_NEIGHBOR, true, data.getInitialNode());
+	        			msg = new Message(id, lChild0, connData);
+	        			send(msg);
         			}
         		}
-        		if (rt.getLeftChild() != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original left child
-	    			ConnectMessage connData = new ConnectMessage(lChild, Role.RIGHT_RT, -index - 1, data.getInitialNode());
-	    			msg = new Message(id, rt.getLeftChild(), connData);
-	    			net.sendMsg(msg);
+    			
+        		if (lChild0 != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's left child
+        			ConnectMessage connData = new ConnectMessage(lChildi, Role.LEFT_RT, -index, true, data.getInitialNode());
+	    			msg = new Message(id, lChild0, connData);
+	    			send(msg);
         		}
     			
-        		if (lChild != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's left child
-        			ConnectMessage connData = new ConnectMessage(rt.getLeftChild(), Role.LEFT_RT, -index - 1, data.getInitialNode());
-	    			msg = new Message(id, lChild, connData);
-	    			net.sendMsg(msg);
+        		if (rChild0 != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's right child
+        			ConnectMessage connData = new ConnectMessage(rChildi, Role.LEFT_RT, -index, true, data.getInitialNode());
+	    			msg = new Message(id, rChild0, connData);
+	    			send(msg);
         		}
 
-        		if (rt.getRightChild() != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original right child
-        			ConnectMessage connData = new ConnectMessage(rChild, Role.RIGHT_RT, -index - 1, data.getInitialNode());
-	    			msg = new Message(id, rt.getRightChild(), connData);
-	    			net.sendMsg(msg);
+        		if (lChildi != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original left child
+	    			ConnectMessage connData = new ConnectMessage(lChild0, Role.RIGHT_RT, -index, true, data.getInitialNode());
+	    			msg = new Message(id, lChildi, connData);
+	    			send(msg);
         		}
-    			
-        		if (rChild != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's right child
-        			ConnectMessage connData = new ConnectMessage(rt.getRightChild(), Role.LEFT_RT, -index - 1, data.getInitialNode());
-	    			msg = new Message(id, rChild, connData);
-	    			net.sendMsg(msg);
+        		
+        		if (rChildi != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original right child
+        			ConnectMessage connData = new ConnectMessage(rChild0, Role.RIGHT_RT, -index, true, data.getInitialNode());
+	    			msg = new Message(id, rChildi, connData);
+	    			send(msg);
         		}
     		}
     		else { //old leaf's right RT
     			if (index == 1){ //this is the right neighbor of the old leaf
         			
-    				if (rt.getRightChild() != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original right child
-	        			ConnectMessage connData = new ConnectMessage(rChild, Role.LEFT_NEIGHBOR, data.getInitialNode());
-	        			net.sendMsg(new Message(id, rt.getRightChild(), connData));
+    				if (rChildi != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original right child
+	        			ConnectMessage connData = new ConnectMessage(rChild0, Role.LEFT_NEIGHBOR, true, data.getInitialNode());
+	        			send(new Message(id, lChildi, connData));
     				}
         			
-        			if (rChild != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's left child
-        				ConnectMessage connData = new ConnectMessage(rt.getLeftChild(), Role.RIGHT_NEIGHBOR, data.getInitialNode());
-        				net.sendMsg(new Message(id, rChild, connData));
+        			if (rChild0 != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's left child
+        				ConnectMessage connData = new ConnectMessage(lChildi, Role.RIGHT_NEIGHBOR, true, data.getInitialNode());
+        				send(new Message(id, rChild0, connData));
         			}
         			
         		}
-    			if (rt.getLeftChild() != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original left child
-	    			ConnectMessage connData = new ConnectMessage(lChild, Role.LEFT_RT, index - 1, data.getInitialNode());
-	    			msg = new Message(id, rt.getLeftChild(), connData);
-	    			net.sendMsg(msg);
-    			}
-    			
-    			if (lChild != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's left child
-	    			ConnectMessage connData = new ConnectMessage(rt.getLeftChild(), Role.RIGHT_RT, index - 1, data.getInitialNode());
-	    			msg = new Message(id, lChild, connData);
-	    			net.sendMsg(msg);
+    			if (lChildi != RoutingTable.DEF_VAL){ //add a link from this node's left child to the original left child
+	    			ConnectMessage connData = new ConnectMessage(lChild0, Role.LEFT_RT, index, true, data.getInitialNode());
+	    			msg = new Message(id, lChildi, connData);
+	    			send(msg);
     			}
 
-    			if (rt.getRightChild() != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original right child
-	    			ConnectMessage connData = new ConnectMessage(rChild, Role.RIGHT_RT, index - 1, data.getInitialNode());
-	    			msg = new Message(id, rt.getRightChild(), connData);
-	    			net.sendMsg(msg);
+    			if (rChildi != RoutingTable.DEF_VAL){ //add a link from this node's right child to the original right child
+	    			ConnectMessage connData = new ConnectMessage(rChild0, Role.LEFT_RT, index, true, data.getInitialNode());
+	    			msg = new Message(id, rChildi, connData);
+	    			send(msg);
     			}
     			
-    			if (rChild != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's right child
-	    			ConnectMessage connData = new ConnectMessage(rt.getRightChild(), Role.LEFT_RT, index - 1, data.getInitialNode());
-	    			msg = new Message(id, rChild, connData);
-	    			net.sendMsg(msg);
+    			if (lChild0 != RoutingTable.DEF_VAL){ //add a link from the original left child to this node's left child
+	    			ConnectMessage connData = new ConnectMessage(lChildi, Role.RIGHT_RT, index, true, data.getInitialNode());
+	    			msg = new Message(id, lChild0, connData);
+	    			send(msg);
+    			}
+    			
+    			if (rChild0 != RoutingTable.DEF_VAL){ //add a link from the original right child to this node's right child
+	    			ConnectMessage connData = new ConnectMessage(rChildi, Role.RIGHT_RT, index, true, data.getInitialNode());
+	    			msg = new Message(id, rChild0, connData);
+	    			send(msg);
     			}
     		}
     	}
@@ -865,6 +864,7 @@ public class D2TreeCore {
     }
     void forwardGetSubtreeSizeRequest(Message msg){
 		GetSubtreeSizeRequest msgData = (GetSubtreeSizeRequest)msg.getData();
+		Mode msgMode = msgData.getMode();
     	if (this.isBucketNode()){
     		Vector<Long> rightRT = rt.getRightRT();
 			//TODO Fix bug (forwardGetSubtreeSizeRequest is seemingly called twice for nodes that are last in their buckets)
@@ -874,20 +874,20 @@ public class D2TreeCore {
     			//long bucketSize = msg.getHops() - 1;
     			long bucketSize = msgData.getSize();
         		String printMsg = "This node is the last in its bucket (size = " + bucketSize +
-    					"). Sending response to its representative, with id " + rt.getRepresentative() + ".";
+    					"). Sending response to its representative, with id " + rt.get(Role.REPRESENTATIVE) + ".";
 		    	this.print(msg, printMsg, msgData.getInitialNode());
-    			msg = new Message(id, rt.getRepresentative(),
-    					new GetSubtreeSizeResponse(bucketSize, msg.getSourceId(), msgData.getInitialNode()));
-    			net.sendMsg(msg);
+    			msg = new Message(id, rt.get(Role.REPRESENTATIVE),
+    					new GetSubtreeSizeResponse(msgMode, bucketSize, msg.getSourceId(), msgData.getInitialNode()));
+    			send(msg);
     		}
     		else {
-		    	String printMsg = "Node " + this.id +
-		    			". Forwarding request to its right neighbor, with id " + rt.getRightRT().get(0) +
-		    			". (size = " + msgData.getSize() + ")";
+//		    	String printMsg = "Node " + this.id +
+//		    			". Forwarding request to its right neighbor, with id " + rt.getRightRT().get(0) +
+//		    			". (size = " + msgData.getSize() + ")";
 		    	//this.print(msg, printMsg);
     			long rightNeighbour = rightRT.get(0);
     			msg.setDestinationId(rightNeighbour);
-    			net.sendMsg(msg);
+    			send(msg);
     		}
     	}
     	else if (this.isLeaf()){
@@ -895,31 +895,28 @@ public class D2TreeCore {
     		if (bucketSize == null)
     		{
     			String printMsg = "This is a leaf. Forwarding to bucket node with id "
-    				+ rt.getBucketNode() + ".";
-	    		//this.print(msg, printMsg);
-    			msg.setDestinationId(rt.getBucketNode());
+    				+ rt.get(Role.BUCKET_NODE) + ".";
+	    		this.print(msg, printMsg, msgData.getInitialNode());
+    			msg.setDestinationId(rt.get(Role.BUCKET_NODE));
     		}
     		else{
+				msg = new Message(id, rt.get(Role.PARENT),
+						new GetSubtreeSizeResponse(msgMode, bucketSize, msg.getSourceId(), msgData.getInitialNode()));
+    			if (rt.get(Role.PARENT) == RoutingTable.DEF_VAL) msg.setDestinationId(id);
     			String printMsg = "This is a leaf with a bucket size of = " + bucketSize +
-    					". Forwarding response to parent with id = " + rt.getRepresentative() + ".";
-    			//this.print(msg, printMsg);
-    			if (rt.getParent() != RoutingTable.DEF_VAL)
-    				msg = new Message(id, id,
-    					new GetSubtreeSizeResponse(bucketSize, msg.getSourceId(), msgData.getInitialNode()));
-    			else
-    				msg = new Message(id, rt.getParent(),
-        				new GetSubtreeSizeResponse(bucketSize, msg.getSourceId(), msgData.getInitialNode()));
+    				". Forwarding response to node with id = " + msg.getDestinationId() + ".";
+    			this.print(msg, printMsg, msgData.getInitialNode());
     		}
-			net.sendMsg(msg);
+			send(msg);
     	}
     	else{
-	    	String printMsg = "This is an inner node. Forwarding to its children with ids "
-	    			+ rt.getLeftChild() + " and " + rt.getRightChild() + ".";
-	    	//this.print(msg, printMsg);
-    		msg.setDestinationId(rt.getLeftChild());
-    		net.sendMsg(msg);
-    		msg.setDestinationId(rt.getRightChild());
-    		net.sendMsg(msg);
+	    	String printMsg = "This is an inner node. Forwarding request to its children with ids "
+	    			+ rt.get(Role.LEFT_CHILD) + " and " + rt.get(Role.RIGHT_CHILD) + ".";
+	    	this.print(msg, printMsg, msgData.getInitialNode());
+    		msg.setDestinationId(rt.get(Role.LEFT_CHILD));
+    		send(msg);
+    		msg.setDestinationId(rt.get(Role.RIGHT_CHILD));
+    		send(msg);
     	}
     }
 
@@ -936,21 +933,35 @@ public class D2TreeCore {
     void forwardGetSubtreeSizeResponse(Message msg){
     	assert msg.getData() instanceof GetSubtreeSizeResponse;
     	GetSubtreeSizeResponse data = (GetSubtreeSizeResponse)msg.getData();
+    	Mode msgMode = data.getMode();
     	long givenSize = data.getSize();
     	long destinationID = data.getDestinationID();
 
 		//determine what the total size of the node's subtree is
-    	//if this is leaf, data.getSize() gives us the size of its bucket, which coincidentally is also the size of its subtree
+    	//if this is leaf, data.getSize() gives us the size of its bucket, which coincidentally is the size of its subtree
     	if (!this.isLeaf()){
-    		String printMsg = "This is not a leaf. Destination ID = " + destinationID + ". (bucket size = " + data.getSize() + ") Mode = " + mode;
+    		String printMsg = "This is not a leaf. Destination ID = " + destinationID + ". (bucket size = " +
+    			data.getSize() + ") Mode = " + mode + " vs MsgMode = " + msgMode;
         	this.print(msg, printMsg, data.getInitialNode());
-			Key key = rt.getLeftChild() == msg.getSourceId() ? Key.LEFT_CHILD_SIZE : Key.RIGHT_CHILD_SIZE;
+			Key key = rt.get(Role.LEFT_CHILD) == msg.getSourceId() ? Key.LEFT_CHILD_SIZE : Key.RIGHT_CHILD_SIZE;
 			this.storedMsgData.put(key, givenSize);
 			Long leftSubtreeSize = this.storedMsgData.get(Key.LEFT_CHILD_SIZE);
 			Long rightSubtreeSize = this.storedMsgData.get(Key.RIGHT_CHILD_SIZE);
+			printMsg = "Incomplete subtree data ("+ leftSubtreeSize + " vs " + rightSubtreeSize + "). ";
 			if (leftSubtreeSize == null || rightSubtreeSize == null){
-	    		printMsg = "Incomplete subtree data. Return and wait for next";
-	        	this.print(msg, printMsg, data.getInitialNode());
+				if (leftSubtreeSize == null){
+					printMsg += "Computing left subtree size (id = " + rt.get(Role.LEFT_CHILD) + ")...";
+		        	this.print(msg, printMsg, data.getInitialNode());
+		    		msg = new Message(destinationID, rt.get(Role.LEFT_CHILD), new GetSubtreeSizeRequest(msgMode, data.getInitialNode()));
+		    		send(msg);
+				}
+				if (rightSubtreeSize == null) {
+		    		printMsg += "Computing right subtree size (id = " + rt.get(Role.RIGHT_CHILD) + ")...";
+		        	this.print(msg, printMsg, data.getInitialNode());
+	    			msg = new Message(destinationID, rt.get(Role.RIGHT_CHILD), new GetSubtreeSizeRequest(msgMode, data.getInitialNode()));
+	    			send(msg);
+					
+	    		}
 				return;
 			}
 			givenSize = leftSubtreeSize + rightSubtreeSize;
@@ -963,35 +974,35 @@ public class D2TreeCore {
 //			else return;
 //	    	msg.setData(data);
 //			msg.setSourceId(id);
-//			net.sendMsg(msg);
+//			send(msg);
     	}
     	else
     		this.storedMsgData.put(Key.BUCKET_SIZE, givenSize);
     	//decide if a message needs to be sent
     	//if (mode == Mode.MODE_CHECK_BALANCE && (this.id == destinationID || this.isLeaf())){
 		if (this.isRoot()) return;
-    	if (this.id != destinationID && mode != Mode.REDISTRIBUTION){
-    		if (rt.getParent() == destinationID){
+    	if (this.id != destinationID && data.getMode() != Mode.REDISTRIBUTION){
+    		if (rt.get(Role.PARENT) == destinationID){
     			String printMsg = "Node " + id + " is not in redistribution mode. Destination ID=" + destinationID + ". Performing a balance check on parent...";
         		this.print(msg, printMsg, data.getInitialNode());
-    			msg = new Message(id, rt.getParent(), new CheckBalanceRequest(givenSize, data.getInitialNode()));
+    			msg = new Message(id, rt.get(Role.PARENT), new CheckBalanceRequest(givenSize, data.getInitialNode()));
     		}
     		else{
     			String printMsg = "Node " + id + " is not in redistribution mode. Destination ID=" + destinationID + ". Forwarding response to parent...";
         		this.print(msg, printMsg, data.getInitialNode());
-    			msg = new Message(id, rt.getParent(), new GetSubtreeSizeResponse(givenSize, data.getDestinationID(), data.getInitialNode()));
+    			msg = new Message(id, rt.get(Role.PARENT), new GetSubtreeSizeResponse(msgMode, givenSize, data.getDestinationID(), data.getInitialNode()));
     		}
-    		net.sendMsg(msg);
+    		send(msg);
     	}
     	//if ((this.id == destinationID || this.isLeaf()) && mode == Mode.MODE_CHECK_BALANCE ){
-    	else if (this.id == destinationID && mode == Mode.CHECK_BALANCE ){
+    	else if (this.id == destinationID && data.getMode() == Mode.CHECK_BALANCE ){
 			String printMsg = "Node " + id + " is in check balance mode. Destination ID=" + destinationID + ". " + "Performing a balance check on ";
     		this.print(msg, printMsg, data.getInitialNode());
     		CheckBalanceRequest newData = new CheckBalanceRequest(givenSize, data.getInitialNode());
     		msg.setData(newData);
     		forwardCheckBalanceRequest(msg);
     	}
-    	else if (this.isLeaf() && mode == Mode.REDISTRIBUTION){
+    	else if (this.isLeaf() && data.getMode() == Mode.REDISTRIBUTION){
     		long noofUncheckedBucketNodes = redistData.get(Key.UNCHECKED_BUCKET_NODES);
     		long noofUncheckedBuckets = redistData.get(Key.UNCHECKED_BUCKETS);
     		long subtreeID = redistData.get(Key.UNEVEN_SUBTREE_ID);
@@ -1036,9 +1047,9 @@ public class D2TreeCore {
 			printErr(new Exception(), data.getInitialNode());
 		else if (this.isLeaf())
 			storedMsgData.put(Key.BUCKET_SIZE, data.getTotalBucketSize());
-    	else if (msg.getSourceId() == rt.getLeftChild())
+    	else if (msg.getSourceId() == rt.get(Role.LEFT_CHILD))
     		this.storedMsgData.put(Key.LEFT_CHILD_SIZE, data.getTotalBucketSize());
-    	else if (msg.getSourceId() == rt.getRightChild())
+    	else if (msg.getSourceId() == rt.get(Role.RIGHT_CHILD))
     		this.storedMsgData.put(Key.RIGHT_CHILD_SIZE, data.getTotalBucketSize());
     	else{
 	    	String printMsg = "Node " + this.id +
@@ -1057,7 +1068,7 @@ public class D2TreeCore {
 		    	String printMsg = "Node " + this.id +
 		    			" is leaf and root. Computing bucket size...";
 		    	this.print(msg, printMsg, data.getInitialNode());
-				msg = new Message(id, id, new GetSubtreeSizeRequest(data.getInitialNode()));
+				msg = new Message(id, id, new GetSubtreeSizeRequest(Mode.CHECK_BALANCE, data.getInitialNode()));
 				if (mode == Mode.NORMAL) mode = Mode.CHECK_BALANCE;
 				forwardGetSubtreeSizeRequest(msg);
 			}
@@ -1065,8 +1076,8 @@ public class D2TreeCore {
 				String printMsg = "Node " + this.id +
 		    			" is a leaf. Forwarding balance check request to parent...";
 		    	this.print(msg, printMsg, data.getInitialNode());
-				msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
-		    	net.sendMsg(msg);
+				msg = new Message(id, rt.get(Role.PARENT), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
+		    	send(msg);
 			}
 			else{
 		    	String printMsg = "Node " + this.id +
@@ -1086,15 +1097,15 @@ public class D2TreeCore {
 				//this isn't a leaf and some subtree data is missing
 				Message msg1 = msg;
 				if (leftSubtreeSize == null) //get left subtree size
-					msg = new Message(id, rt.getLeftChild(), new GetSubtreeSizeRequest(data.getInitialNode()));
-				else this.storedMsgData.put(Key.UNEVEN_CHILD, rt.getLeftChild());
+					msg = new Message(id, rt.get(Role.LEFT_CHILD), new GetSubtreeSizeRequest(Mode.CHECK_BALANCE, data.getInitialNode()));
+				else this.storedMsgData.put(Key.UNEVEN_CHILD, rt.get(Role.LEFT_CHILD));
 				if (rightSubtreeSize == null) //get right subtree size
-					msg = new Message(id, rt.getRightChild(), new GetSubtreeSizeRequest(data.getInitialNode()));
-				else this.storedMsgData.put(Key.UNEVEN_CHILD, rt.getRightChild());
-				String printMsg = msg.getDestinationId() == rt.getLeftChild() ? "left child..." : "right child..." ;
+					msg = new Message(id, rt.get(Role.RIGHT_CHILD), new GetSubtreeSizeRequest(Mode.CHECK_BALANCE, data.getInitialNode()));
+				else this.storedMsgData.put(Key.UNEVEN_CHILD, rt.get(Role.RIGHT_CHILD));
+				String printMsg = msg.getDestinationId() == rt.get(Role.LEFT_CHILD) ? "left child..." : "right child..." ;
 				printMsg = "This node is missing subtree data. Sending size request to its " + printMsg;
 				this.print(msg1, printMsg, data.getInitialNode());
-				net.sendMsg(msg);
+				send(msg);
 	    	}
 			else if (isBalanced()){
 				
@@ -1106,13 +1117,13 @@ public class D2TreeCore {
 //		        			"| ). Doing an extension/contraction test...";
 //		    		this.print(msg, printMsg, data.getInitialNode());
 //		    		ExtendContractRequest ecData = new ExtendContractRequest(0, data.getInitialNode());
-//		    		long target = rt.getLeftAdjacentNode() != RoutingTable.DEF_VAL ? rt.getLeftAdjacentNode() : rt.getRightAdjacentNode();
+//		    		long target = rt.get(Role.LEFT_A_NODE) != RoutingTable.DEF_VAL ? rt.get(Role.LEFT_A_NODE) : rt.get(Role.RIGHT_A_NODE);
 //		    		msg = new Message(id, target, ecData);
-//		    		net.sendMsg(msg);
+//		    		send(msg);
 //				}
-				if (rt.getLeftAdjacentNode() == rt.getLeftChild() || rt.getRightAdjacentNode() == rt.getRightChild()){
+				if (rt.get(Role.LEFT_A_NODE) == rt.get(Role.LEFT_CHILD) || rt.get(Role.RIGHT_A_NODE) == rt.get(Role.RIGHT_CHILD)){
 		        	String printMsg = "This is a balanced inner node ( |" + leftSubtreeSize + "| vs |" + rightSubtreeSize +
-		        			"| ). Children " + rt.getLeftChild() + " and " + rt.getRightChild() +
+		        			"| ). Children " + rt.get(Role.LEFT_CHILD) + " and " + rt.get(Role.RIGHT_CHILD) +
 		        			" are leaves and are always balanced. Nothing to redistribute here...";
 		        	//printMsg += "Checking if the tree needs extension/contraction...";
 		    		this.print(msg, printMsg, data.getInitialNode());
@@ -1123,19 +1134,19 @@ public class D2TreeCore {
 		    		
 //		    		ExtendContractRequest exData = new ExtendContractRequest(totalBucketNodes, rt.getHeight() + 1, data.getInitialNode());
 //		    		msg = new Message(id, id, exData);
-//		    		//net.sendMsg(msg);
+//		    		//send(msg);
 //		    		forwardExtendContractRequest(msg);
 		    	}
 				else {
 					String printMsg = "This is a balanced inner node ( |" + leftSubtreeSize + "| vs |" + rightSubtreeSize + "| ). Forwarding balance check request " +
 						"to uneven child with id = " + unevenChild + "...";
 					this.print(msg, printMsg, data.getInitialNode());
-					Key key = rt.getLeftChild() == unevenChild ? Key.LEFT_CHILD_SIZE : Key.RIGHT_CHILD_SIZE;
+					Key key = rt.get(Role.LEFT_CHILD) == unevenChild ? Key.LEFT_CHILD_SIZE : Key.RIGHT_CHILD_SIZE;
 					long totalSubtreeSize = this.storedMsgData.get(key);
 					this.storedMsgData.remove(Key.LEFT_CHILD_SIZE);
 					this.storedMsgData.remove(Key.RIGHT_CHILD_SIZE);
 					msg = new Message(id, unevenChild, new RedistributionRequest(totalSubtreeSize, 1, unevenChild, data.getInitialNode()));
-					net.sendMsg(msg);
+					send(msg);
 					mode = Mode.REDISTRIBUTION;
 				}
 			}
@@ -1146,8 +1157,8 @@ public class D2TreeCore {
 				if (!isRoot()){
 					String printMsg = "This is an unbalanced inner node ( |" + leftSubtreeSize + "| vs |" + rightSubtreeSize + "| ). Forwarding balance check request to parent...";
 			    	this.print(msg, printMsg, data.getInitialNode());
-					msg = new Message(id, rt.getParent(), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
-			    	net.sendMsg(msg);
+					msg = new Message(id, rt.get(Role.PARENT), new CheckBalanceRequest(data.getTotalBucketSize(), data.getInitialNode()));
+			    	send(msg);
 				}
 				else {
 					String printMsg = "This is the root and it's unbalanced ( |" + leftSubtreeSize + "| vs |" + rightSubtreeSize + "| ). Performing full tree redistribution...";
@@ -1173,97 +1184,124 @@ public class D2TreeCore {
     	DisconnectMessage data = (DisconnectMessage)msg.getData();
     	long nodeToRemove = data.getNodeToRemove();
     	RoutingTable.Role role = data.getRole();
-    	switch (role){
-    	case BUCKET_NODE:
-    		if (rt.getBucketNode() == nodeToRemove) rt.setBucketNode(RoutingTable.DEF_VAL); break;
-		case REPRESENTATIVE:
-			if (rt.getRepresentative() == nodeToRemove) rt.setRepresentative(RoutingTable.DEF_VAL); break;
-		case LEFT_A_NODE:
-    		if (rt.getLeftAdjacentNode() == nodeToRemove) rt.setLeftAdjacentNode(RoutingTable.DEF_VAL); break;
-		case RIGHT_A_NODE:
-			if (rt.getRightAdjacentNode() == nodeToRemove) rt.setRightAdjacentNode(RoutingTable.DEF_VAL); break;
-		case LEFT_CHILD: 
-			if (rt.getLeftChild() == nodeToRemove) rt.setLeftChild(RoutingTable.DEF_VAL); break;
-		case RIGHT_CHILD:
-			if (rt.getRightChild() == nodeToRemove) rt.setRightChild(RoutingTable.DEF_VAL); break;
-		case PARENT:
-			if (rt.getParent() == nodeToRemove) rt.setParent(RoutingTable.DEF_VAL); break;
-		case LEFT_NEIGHBOR:
-			if (rt.getLeftRT().get(0) == nodeToRemove){
-				Vector<Long> leftRT = rt.getLeftRT();
-				leftRT.remove(0);
-				rt.setLeftRT(leftRT);
-			}
-			break;
-		case RIGHT_NEIGHBOR:
-			if (rt.getRightRT().get(0) == nodeToRemove){
-				Vector<Long> rightRT = rt.getRightRT();
-				rightRT.remove(0);
-				rt.setRightRT(rightRT);
-			}
-			break;
-		default:
-			break;
-    	}
+    	if (rt.get(role) == nodeToRemove)
+    		rt.set(role, RoutingTable.DEF_VAL);
+//    	switch (role){
+//    	case BUCKET_NODE:
+//    		if (rt.getBucketNode() == nodeToRemove) rt.setBucketNode(RoutingTable.DEF_VAL); break;
+//		case REPRESENTATIVE:
+//			if (rt.getRepresentative() == nodeToRemove) rt.setRepresentative(RoutingTable.DEF_VAL); break;
+//		case LEFT_A_NODE:
+//    		if (rt.getLeftAdjacentNode() == nodeToRemove) rt.setLeftAdjacentNode(RoutingTable.DEF_VAL); break;
+//		case RIGHT_A_NODE:
+//			if (rt.getRightAdjacentNode() == nodeToRemove) rt.setRightAdjacentNode(RoutingTable.DEF_VAL); break;
+//		case LEFT_CHILD: 
+//			if (rt.getLeftChild() == nodeToRemove) rt.setLeftChild(RoutingTable.DEF_VAL); break;
+//		case RIGHT_CHILD:
+//			if (rt.getRightChild() == nodeToRemove) rt.setRightChild(RoutingTable.DEF_VAL); break;
+//		case PARENT:
+//			if (rt.getParent() == nodeToRemove) rt.setParent(RoutingTable.DEF_VAL); break;
+//		case LEFT_NEIGHBOR:
+//			if (rt.getLeftRT().get(0) == nodeToRemove){
+//				Vector<Long> leftRT = rt.getLeftRT();
+//				leftRT.remove(0);
+//				rt.setLeftRT(leftRT);
+//			}
+//			break;
+//		case RIGHT_NEIGHBOR:
+//			if (rt.getRightRT().get(0) == nodeToRemove){
+//				Vector<Long> rightRT = rt.getRightRT();
+//				rightRT.remove(0);
+//				rt.setRightRT(rightRT);
+//			}
+//			break;
+//		default:
+//			break;
+//    	}
     }
     void connect(Message msg) {
     	assert msg.getData() instanceof ConnectMessage;
     	ConnectMessage data = (ConnectMessage)msg.getData();
     	long nodeToAdd = data.getNode();
+    	int index = data.getIndex();
     	RoutingTable.Role role = data.getRole();
 //		String printMsg = "Setting " + nodeToAdd + " as the ";
-    	switch (role){
-    	case BUCKET_NODE: 
-//    		printMsg += "bucket node of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-    		rt.setBucketNode(nodeToAdd); break;
-		case REPRESENTATIVE:
-//    		printMsg += "representative of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			rt.setRepresentative(nodeToAdd); break;
-		case LEFT_A_NODE:
-//    		printMsg += "left adjacent node of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-    		rt.setLeftAdjacentNode(nodeToAdd); break;
-		case RIGHT_A_NODE:
-//    		printMsg += "right adjacent node of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			rt.setRightAdjacentNode(nodeToAdd); break;
-		case LEFT_CHILD:
-//    		printMsg += "left child of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			rt.setLeftChild(nodeToAdd); break;
-		case RIGHT_CHILD:
-//    		printMsg += "right child of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			rt.setRightChild(nodeToAdd); break;
-		case PARENT:
-//    		printMsg += "parent of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			rt.setParent(nodeToAdd); break;
-		case LEFT_NEIGHBOR:
-//    		printMsg += "left neighbor of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			Vector<Long> leftRT = rt.getLeftRT();
-			if (!leftRT.isEmpty())
-				leftRT.set(0, nodeToAdd);
-			else
-				leftRT.add(nodeToAdd);
-			rt.setLeftRT(leftRT);
-			break;
-		case RIGHT_NEIGHBOR:
-//    		printMsg += "right neighbor of node " + id + "...";
-//        	this.print(msg, printMsg, data.getInitialNode());
-			Vector<Long> rightRT = rt.getRightRT();
-			if (!rightRT.isEmpty())
-				rightRT.set(0, nodeToAdd);
-			else
-				rightRT.add(nodeToAdd);
-			rt.setRightRT(rightRT);
-			break;
-		default:
-			break;
-    	}
+    	rt.set(role, index, nodeToAdd);
+//    	switch (role){
+//    	case BUCKET_NODE: 
+////    		printMsg += "bucket node of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getBucketNode() == RoutingTable.DEF_VAL)
+//    			rt.setBucketNode(nodeToAdd); break;
+//		case REPRESENTATIVE:
+////    		printMsg += "representative of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getRepresentative() == RoutingTable.DEF_VAL)
+//    			rt.setRepresentative(nodeToAdd); break;
+//		case LEFT_A_NODE:
+////    		printMsg += "left adjacent node of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getLeftAdjacentNode() == RoutingTable.DEF_VAL)
+//    			rt.setLeftAdjacentNode(nodeToAdd); break;
+//		case RIGHT_A_NODE:
+////    		printMsg += "right adjacent node of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getRightAdjacentNode() == RoutingTable.DEF_VAL)
+//    			rt.setRightAdjacentNode(nodeToAdd); break;
+//		case LEFT_CHILD:
+////    		printMsg += "left child of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getLeftChild() == RoutingTable.DEF_VAL)
+//    			rt.setLeftChild(nodeToAdd); break;
+//		case RIGHT_CHILD:
+////    		printMsg += "right child of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getRightChild() == RoutingTable.DEF_VAL)
+//    			rt.setRightChild(nodeToAdd); break;
+//		case PARENT:
+////    		printMsg += "parent of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		if (data.replaces() || rt.getParent() == RoutingTable.DEF_VAL)
+//    			rt.setParent(nodeToAdd); break;
+//		case LEFT_NEIGHBOR:
+////    		printMsg += "left neighbor of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//			Vector<Long> leftRT = rt.getLeftRT();
+//			if (data.replaces() && !leftRT.isEmpty())
+//				leftRT.set(0, nodeToAdd);
+//			else
+//				leftRT.add(nodeToAdd);
+//			rt.setLeftRT(leftRT);
+//			break;
+//		case RIGHT_NEIGHBOR:
+////    		printMsg += "right neighbor of node " + id + "...";
+////        	this.print(msg, printMsg, data.getInitialNode());
+//    		Vector<Long> rightRT = rt.getRightRT();
+//			if (data.replaces() && !rightRT.isEmpty())
+//				rightRT.set(0, nodeToAdd);
+//			else
+//				rightRT.add(nodeToAdd);
+//			rt.setRightRT(rightRT);
+//			break;
+//		case LEFT_RT:
+//			leftRT = rt.getLeftRT();
+//    		if (data.replaces() || leftRT.get(index) == RoutingTable.DEF_VAL){
+//    			while (index >= leftRT.size()) leftRT.add(-1L);
+//				leftRT.set(index, nodeToAdd);
+//				rt.setLeftRT(leftRT);
+//    		}
+//			break;
+//		case RIGHT_RT:
+//			rightRT = rt.getRightRT();
+//    		if (data.replaces() || rightRT.get(index) == RoutingTable.DEF_VAL){
+//    			while (index >= rightRT.size()) rightRT.add(-1L);
+//				rightRT.set(index, nodeToAdd);
+//				rt.setRightRT(rightRT);
+//    		}
+//			break;
+//		default:
+//			break;
+//    	}
     }
     void forwardLookupRequest(Message msg) {
     	assert msg.getData() instanceof LookupRequest;
@@ -1277,7 +1315,7 @@ public class D2TreeCore {
     	if (id == msg.getSourceId()){
 	    	for (int i = 0; i < data.getInitialNode(); i++){
 	    		Message msg1 = new Message(id, i + 1, new PrintRTMessage(data.getInitialNode()));
-	    		net.sendMsg(msg1);
+	    		send(msg1);
 	    	}
     	}
     	//if (srcMsgType == D2TreeMessageT.EXTEND_REQ || srcMsgType == D2TreeMessageT.TRANSFER_RES){
@@ -1306,46 +1344,46 @@ public class D2TreeCore {
 	    	if (data.goesDown()){
 				msg.setData(data);
 	    		if(isLeaf()){
-	    			long destination = rt.getBucketNode();
+	    			long destination = rt.get(Role.BUCKET_NODE);
 	    			if (destination != RoutingTable.DEF_VAL)
 	    				msg.setDestinationId(destination);
-	    			net.sendMsg(msg);
+	    			send(msg);
 	    		}
 	    		else if (isBucketNode()){
 	    			if (rt.getRightRT().isEmpty()) return;
 	    			long destination = rt.getRightRT().get(0);
 	    			if (destination != RoutingTable.DEF_VAL)
 	    				msg.setDestinationId(destination);
-	    			net.sendMsg(msg);
+	    			send(msg);
 	    		}
 	    		else{
-	    			if (rt.getLeftChild() != RoutingTable.DEF_VAL && rt.getRightChild() != RoutingTable.DEF_VAL){
-	    				msg = new Message(id, rt.getLeftChild(), data);
-	        			//msg.setDestinationId(rt.getLeftChild());
-	        			net.sendMsg(msg);
+	    			if (rt.get(Role.LEFT_CHILD) != RoutingTable.DEF_VAL && rt.get(Role.RIGHT_CHILD) != RoutingTable.DEF_VAL){
+	    				msg = new Message(id, rt.get(Role.LEFT_CHILD), data);
+	        			//msg.setDestinationId(rt.get(Role.LEFT_CHILD));
+	        			send(msg);
 	        			
-	        			msg = new Message(id, rt.getRightChild(), data);
-	        			//msg.setDestinationId(rt.getRightChild());
-	        			net.sendMsg(msg);
+	        			msg = new Message(id, rt.get(Role.RIGHT_CHILD), data);
+	        			//msg.setDestinationId(rt.get(Role.RIGHT_CHILD));
+	        			send(msg);
 	    			}
 	    			else
-	    				net.sendMsg(msg);
+	    				send(msg);
 	    		}
 	    		if (msg.getDestinationId() == id) return;
 	    	}
 	    	else {
 	    		if (this.isBucketNode())
-	    			msg.setDestinationId(rt.getRepresentative());
+	    			msg.setDestinationId(rt.get(Role.REPRESENTATIVE));
 	    		else
-	    			msg.setDestinationId(rt.getParent());
-	    		net.sendMsg(msg);
+	    			msg.setDestinationId(rt.get(Role.PARENT));
+	    		send(msg);
 	    	}
     	}
 	}
     boolean isLeaf(){
     	//leaves don't have children or a representative
     	boolean itIs = !hasRepresentative() && !hasLeftChild() && !hasRightChild();
-    	if (itIs && rt.getBucketNode() == RoutingTable.DEF_VAL){
+    	if (itIs && rt.get(Role.BUCKET_NODE) == RoutingTable.DEF_VAL){
     		try {
     			PrintWriter out = new PrintWriter(new FileWriter(logDir + "isLeaf.log", true));
     			new RuntimeException().printStackTrace(out);
@@ -1370,20 +1408,32 @@ public class D2TreeCore {
     	return !hasParent() && !hasRepresentative();
     }
     boolean hasParent(){
-    	return rt.getParent() != RoutingTable.DEF_VAL;
+    	return rt.get(Role.PARENT) != RoutingTable.DEF_VAL;
     }
     boolean hasRepresentative(){
-    	return rt.getRepresentative() != RoutingTable.DEF_VAL;
+    	return rt.get(Role.REPRESENTATIVE) != RoutingTable.DEF_VAL;
     }
     boolean hasLeftChild(){
-    	return rt.getLeftChild() != RoutingTable.DEF_VAL;
+    	return rt.get(Role.LEFT_CHILD) != RoutingTable.DEF_VAL;
     }
     boolean hasRightChild(){
-    	return rt.getRightChild() != RoutingTable.DEF_VAL;
+    	return rt.get(Role.RIGHT_CHILD) != RoutingTable.DEF_VAL;
     }
     int getRtSize() {
         return rt.size();
     }
+    
+    void send(Message msg){
+    	if (msg.getDestinationId() == RoutingTable.DEF_VAL){
+    		NullPointerException ex = new NullPointerException();
+    		ex.printStackTrace();
+    		System.err.println(msg);
+    		System.err.println(msg.getData());
+    		//throw ex;
+    	}
+    	net.sendMsg(msg);
+    }
+    
     void printRT(Message msg){
     	PrintRTMessage data = (PrintRTMessage)msg.getData();
     	String logFile = logDir + "main" + data.getInitialNode() + ".txt";
