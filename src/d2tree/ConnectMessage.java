@@ -12,6 +12,7 @@ public class ConnectMessage extends MessageBody {
 	private long initialNode;
 	private boolean replace;
 	public ConnectMessage(long node, Role role, boolean replace, long initialNode){
+//		assert node != RoutingTable.DEF_VAL;
 		this.role = role;
 		this.node = node;
 		this.index = 0;
@@ -19,6 +20,7 @@ public class ConnectMessage extends MessageBody {
 		this.initialNode = initialNode;
 	}
 	public ConnectMessage(long node, Role role, int index, boolean replace, long initialNode){
+//		assert node != RoutingTable.DEF_VAL;
 		this.role = role;
 		this.node = node;
 		this.index = index;
@@ -42,7 +44,7 @@ public class ConnectMessage extends MessageBody {
     }
     @Override
     public int getType() {
-        return D2TreeMessageT.JOIN_RES;
+        return D2TreeMessageT.CONNECT_MSG;
     }
 
 }

@@ -51,7 +51,7 @@ public class D2Tree extends Peer {
             case D2TreeMessageT.JOIN_REQ:
                 Core.forwardJoinRequest(msg);
                 break;
-            case D2TreeMessageT.JOIN_RES:
+            case D2TreeMessageT.CONNECT_MSG:
                 Core.connect(msg);
                 isOnline = true;
                 break;

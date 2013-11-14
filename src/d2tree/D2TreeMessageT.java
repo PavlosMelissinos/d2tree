@@ -5,7 +5,7 @@ import p2p.simulator.message.MessageT;
 public class D2TreeMessageT extends MessageT {
 	private static final long serialVersionUID = 2160112452787414344L;
 	static final int JOIN_REQ             = 1001;
-    static final int JOIN_RES             = 1002;
+    static final int CONNECT_MSG          = 1002;
     static final int REDISTRIBUTE_REQ     = 1003;
     static final int REDISTRIBUTE_RES     = 1004;
     static final int GET_SUBTREE_SIZE_REQ = 1005;
@@ -25,7 +25,7 @@ public class D2TreeMessageT extends MessageT {
     	switch(msgType){
     	case JOIN_REQ:
     		return "JOIN REQUEST";
-    	case JOIN_RES:
+    	case CONNECT_MSG:
     		return "JOIN RESPONSE";
     	case REDISTRIBUTE_REQ:
     		return "REDISTRIBUTE REQUEST";

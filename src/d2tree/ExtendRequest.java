@@ -10,17 +10,22 @@ public class ExtendRequest extends MessageBody {
 	private long oldOptimalBucketSize;
 	private long initialNode;
 	private boolean left;
+	private long optimalHeight;
 	
     //public ExtendRequest(long optimalBucketSize, long oldOptimalBucketSize, long initialNode) {
-	public ExtendRequest(long oldOptimalBucketSize, boolean left, long initialNode) {
+	public ExtendRequest(long oldOptimalBucketSize, boolean left, long initialNode, long optimalHeight) {
     	//this.optimalBucketSize = optimalBucketSize;
     	this.oldOptimalBucketSize = oldOptimalBucketSize;
     	this.initialNode = initialNode;
     	this.left = left;
+    	this.optimalHeight = optimalHeight;
     }
 
 	long getInitialNode(){
 		return initialNode;
+	}
+	long getOptimalHeight(){
+	    return this.optimalHeight;
 	}
 	boolean buildsLeftLeaf(){
 		return left;

@@ -6,7 +6,8 @@
 package d2tree;
 
 import java.io.PrintWriter;
-import java.util.Vector;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  *
@@ -15,52 +16,35 @@ import java.util.Vector;
 public class RoutingTable {
 	public static Long DEF_VAL = -1L;
 	public static enum Role {
+		//base tree
 		LEFT_CHILD,
 		RIGHT_CHILD,
 		PARENT,
-		LEFT_NEIGHBOR,
-		RIGHT_NEIGHBOR,
+		//level groups
 		LEFT_RT,
 		RIGHT_RT,
+		//adjacency
 		LEFT_A_NODE,
 		RIGHT_A_NODE,
+		//buckets
 		BUCKET_NODE,
 		REPRESENTATIVE;
 	};
-
-	//base tree
-	private long leftChild;
-	private long rightChild;
-	private long parent;
+	private ArrayList<Long> leftRT;
+	private ArrayList<Long> rightRT;
+	private HashMap<Role, Long> visiblePeers;
 	
-	//level groups
-	private Vector<Long> leftRT;
-	private Vector<Long> rightRT;
-
-	//adjacency
-	private long leftAdjacentNode;
-	private long rightAdjacentNode;
-	
-	//buckets
-	private long bucketNode;
-	private long representative;
-    
     RoutingTable() {
-    	this.leftChild = DEF_VAL;
-        this.rightChild = DEF_VAL;
-        this.parent = DEF_VAL;
-        
-        this.leftRT = new Vector<Long>();
-        this.rightRT = new Vector<Long>();
-        
-        this.leftAdjacentNode = DEF_VAL;
-        this.rightAdjacentNode = DEF_VAL;
-        
-        this.bucketNode = DEF_VAL;
-        this.representative = DEF_VAL;
+        this.leftRT = new ArrayList<Long>();
+        this.rightRT = new ArrayList<Long>();
+        this.visiblePeers = new HashMap<Role, Long>();
     }
     void set(Role role, int index, long value){
-    	if (value == DEF_VAL) return;
+    	if (value == DEF_VAL){
+    	    new IllegalArgumentException().printStackTrace();
+    	    unset(role, index, get(role, index));
+    	    return;
+    	}
     	switch (role){
 		case LEFT_RT:
 			while (index >= leftRT.size()) leftRT.add(DEF_VAL);
@@ -76,86 +60,92 @@ public class RoutingTable {
 			set(role, value);
     	}
     }
-    void set(Role role, long value){
-    	if (value == DEF_VAL) return;
+	void set(Role role, long value) throws IllegalArgumentException{
+		assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
+		if (value == DEF_VAL) {
+		    throw new IllegalArgumentException();
+		}
+		else
+	    	this.visiblePeers.put(role, value);
+    }
+	void unset(Role role, int index, long oldValue){
     	switch (role){
-    	case BUCKET_NODE: 
-			this.bucketNode = value; break;
-		case REPRESENTATIVE:
-	        this.representative = value; break;
-		case LEFT_A_NODE:
-	        this.leftAdjacentNode = value; break;
-		case RIGHT_A_NODE:
-	        this.rightAdjacentNode = value; break;
-		case LEFT_CHILD:
-	        this.leftChild = value; break;
-		case RIGHT_CHILD:
-	        this.rightChild = value; break;
-		case PARENT:
-	        this.parent = value; break;
-		case LEFT_NEIGHBOR:
-			if (!leftRT.isEmpty())
-				leftRT.set(0, value);
-			else
-				leftRT.add(value);
+		case LEFT_RT:
+			if (leftRT.size() > index && leftRT.get(index) == oldValue)
+				leftRT.remove(index);
 			break;
-		case RIGHT_NEIGHBOR:
-			if (!rightRT.isEmpty())
-				rightRT.set(0, value);
-			else
-				rightRT.add(value);
+		case RIGHT_RT:
+			if (rightRT.size() > index && rightRT.get(index) == oldValue)
+				rightRT.remove(index);
 			break;
 		default:
-			break;
+			unset(role, oldValue);
+		}
+	}
+	void unset(Role role, long oldValue){
+	    assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
+	    if (this.visiblePeers.containsKey(role) && this.visiblePeers.get(role) == oldValue)
+            this.visiblePeers.remove(role);
+	}
+	void unset(Role role){
+	    assert role == Role.LEFT_RT || role == Role.RIGHT_RT;
+        if (role == Role.LEFT_RT)
+            leftRT.clear();
+        else if (role == Role.RIGHT_RT)
+            rightRT.clear();
+	}
+//	void setRT(Role role, ArrayList<Long> values){
+//	    if (role == Role.LEFT_RT){
+//	        this.leftRT = values;
+//	    }
+//	    else if (role == Role.RIGHT_RT){
+//	        this.rightRT = values;
+//	    }
+//	    else throw new IllegalArgumentException();
+//	}
+//    void setLeftRT(Vector<Long> values) {
+//    	this.leftRT = values;
+//    }
+//    
+//    void setRightRT(Vector<Long> values) {
+//    	this.rightRT = values;
+//    }
+    long get(Role role, int index){
+    	long value = DEF_VAL;
+    	if (role == Role.LEFT_RT){
+    	    if (index < this.leftRT.size())
+    	        value = this.leftRT.get(index);
     	}
+    	else if (role == Role.RIGHT_RT){
+    	    if (index < this.rightRT.size())
+    	        value = this.rightRT.get(index);
+    	}
+    	else value = get(role);
+    	return value;
     }
-
-    void setLeftRT(Vector<Long> values) {
-    	this.leftRT = values;
-    }
-    
-    void setRightRT(Vector<Long> values) {
-    	this.rightRT = values;
-    }
-
     long get(Role role){
-    	long value = 0;
-    	switch (role){
-    	case BUCKET_NODE: 
-			value = this.bucketNode; break;
-		case REPRESENTATIVE:
-			value = this.representative; break;
-		case LEFT_A_NODE:
-			value = this.leftAdjacentNode; break;
-		case RIGHT_A_NODE:
-			value = this.rightAdjacentNode; break;
-		case LEFT_CHILD:
-			value = this.leftChild; break;
-		case RIGHT_CHILD:
-			value = this.rightChild; break;
-		case PARENT:
-			value = this.parent; break;
-		case LEFT_NEIGHBOR:
-			value = leftRT.firstElement(); break;
-		case RIGHT_NEIGHBOR:
-			value = rightRT.firstElement(); break;
-		default:
-			try {
-				throw new Exception();
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} break;
-    	}
-		return value;
+		assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
+		return visiblePeers.containsKey(role) ? this.visiblePeers.get(role) : DEF_VAL;
     }
     
-    Vector<Long> getLeftRT() {
-        return this.leftRT;
+    boolean contains(Role role, int index){
+        if (role == Role.LEFT_RT)
+            return this.leftRT.contains(index);
+        else if (role == Role.RIGHT_RT)
+            return this.rightRT.contains(index);
+        else return contains(role);
     }
     
-    Vector<Long> getRightRT() {
-        return this.rightRT;
+    boolean contains(Role role){
+        assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
+        return visiblePeers.containsKey(role) && visiblePeers.get(role) != DEF_VAL;
+    }
+    boolean isEmpty(Role role){
+        if (role == Role.LEFT_RT)
+            return this.leftRT.isEmpty();
+        else if (role == Role.RIGHT_RT)
+            return this.rightRT.isEmpty();
+        else throw new IllegalArgumentException();
     }
     
     int size() {
@@ -164,28 +154,27 @@ public class RoutingTable {
     	size += rightRT.size();
         return size;
     }
+    int size(Role role){
+        if (role == Role.LEFT_RT)
+            return this.leftRT.size();
+        else if (role == Role.RIGHT_RT)
+            return this.rightRT.size();
+        else
+            throw new IllegalArgumentException();
+    }
     long getHeight(){
     	return Math.max(leftRT.size(), rightRT.size()) + 1;
     }
     void print(PrintWriter out){
-//		out.println("P = " + getParent() +
-//				 ", LC = " + getLeftChild() +
-//				 ", RC = " + getRightChild() +
-//				 ", LA = " + getLeftAdjacentNode() +
-//				 ", RA = " + getRightAdjacentNode() +
-//				", LRT = " + getLeftRT() +
-//				", RRT = " + getRightRT() +
-//				 ", BN = " + getBucketNode() +
-//				 ", RN = " + getRepresentative());
         out.format( "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, LRT = [",
         		get(Role.PARENT), get(Role.LEFT_CHILD), get(Role.RIGHT_CHILD), get(Role.LEFT_A_NODE), get(Role.RIGHT_A_NODE),
         		get(Role.BUCKET_NODE), get(Role.REPRESENTATIVE));
-        for (Long node : getLeftRT()){
+        for (Long node : leftRT){
         	out.format("%3d ", node);
         }
         //if (getLeftRT().isEmpty())  out.print("    ");
         out.print("], RRT = [");
-        for (Long node : getRightRT()){
+        for (Long node : rightRT){
         	out.format("%3d ", node);
         }
         //if (getRightRT().isEmpty()) out.print("    ");

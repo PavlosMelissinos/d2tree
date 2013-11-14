@@ -8,6 +8,7 @@ public class DisconnectMessage extends MessageBody {
 	private static final long serialVersionUID = 3768244034950885149L;
 
 	private Role role;
+	private int index;
 	private long nodeToRemove;
 	private long initialNode;
 	
@@ -16,11 +17,20 @@ public class DisconnectMessage extends MessageBody {
 		this.nodeToRemove = nodeToRemove;
 		this.initialNode = initialNode;
 	}
+	public DisconnectMessage(long nodeToRemove, Role role, int index, long initialNode){
+		this.role = role;
+		this.nodeToRemove = nodeToRemove;
+		this.index = index;
+		this.initialNode = initialNode;
+	}
 	long getInitialNode(){
 		return initialNode;
 	}
 	public Role getRole(){
-		return this.role;
+		return role;
+	}
+	public int getIndex(){
+		return index;
 	}
 	public long getNodeToRemove(){
 		return this.nodeToRemove;
