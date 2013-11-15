@@ -1271,76 +1271,39 @@ public class D2TreeCore {
     	//System.out.println("Not supported yet.");
     }
     void printTree(Message msg) {
-    	//TODO get to the root and then print downwards
-    	PrintMessage data = (PrintMessage)msg.getData();
-    	int srcMsgType = data.getSourceType();
-    	if (id == msg.getSourceId()){
-	    	for (int i = 0; i < data.getInitialNode(); i++){
-	    		Message msg1 = new Message(id, i + 1, new PrintRTMessage(data.getInitialNode()));
-	    		send(msg1);
-	    	}
-    	}
-    	//if (srcMsgType == D2TreeMessageT.EXTEND_REQ || srcMsgType == D2TreeMessageT.TRANSFER_RES){
-        if (srcMsgType != D2TreeMessageT.JOIN_REQ){
-	    	String logFile = logDir + "main" + data.getInitialNode() + ".log";
-	    	String allLogFile = logDir + "main.log";
-	    	System.out.println("Saving log to " + logFile);
-    		PrintWriter out = null;
-			try {
-				String msgType = isRoot() ? D2TreeMessageT.toString(data.getSourceType()) + "\n" : "";
-					
-				out = new PrintWriter(new FileWriter(logFile, true));
-	    		out.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(), id);
-	    		rt.print(out);
-	    		out.close();
-
-				out = new PrintWriter(new FileWriter(allLogFile, true));
-	    		out.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(), id);
-	    		rt.print(out);
-	    		out.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-	    	if (isRoot())
-	    		data = new PrintMessage(true, srcMsgType, data.getInitialNode());
-	    	if (data.goesDown()){
-				msg.setData(data);
-	    		if(isLeaf()){
-	    			long destination = rt.get(Role.BUCKET_NODE);
-	    			if (destination != RoutingTable.DEF_VAL)
-	    				msg.setDestinationId(destination);
-	    			send(msg);
-	    		}
-	    		else if (isBucketNode()){
-	    			if (rt.isEmpty(Role.RIGHT_RT)) return;
-	    			long destination = rt.get(Role.RIGHT_RT, 0);
-	    			if (destination != RoutingTable.DEF_VAL)
-	    				msg.setDestinationId(destination);
-	    			send(msg);
-	    		}
-	    		else{
-	    			if (rt.get(Role.LEFT_CHILD) != RoutingTable.DEF_VAL && rt.get(Role.RIGHT_CHILD) != RoutingTable.DEF_VAL){
-	    				msg = new Message(id, rt.get(Role.LEFT_CHILD), data);
-	        			//msg.setDestinationId(rt.get(Role.LEFT_CHILD));
-	        			send(msg);
-	        			
-	        			msg = new Message(id, rt.get(Role.RIGHT_CHILD), data);
-	        			//msg.setDestinationId(rt.get(Role.RIGHT_CHILD));
-	        			send(msg);
-	    			}
-	    			else
-	    				send(msg);
-	    		}
-	    		if (msg.getDestinationId() == id) return;
-	    	}
-	    	else {
-	    		if (this.isBucketNode())
-	    			msg.setDestinationId(rt.get(Role.REPRESENTATIVE));
-	    		else
-	    			msg.setDestinationId(rt.get(Role.PARENT));
-	    		send(msg);
-	    	}
-    	}
+        PrintMessage data = (PrintMessage) msg.getData();
+        if (id == msg.getSourceId()) {
+            for (int i = 0; i < data.getInitialNode(); i++) {
+                Message msg1 = new Message(id, i + 1, new PrintRTMessage(
+                        data.getInitialNode()));
+                send(msg1);
+            }
+        }
+        if (data.getSourceType() == D2TreeMessageT.JOIN_REQ) return;
+        String allLogFile = logDir + "main.log";
+        // String logFile = logDir + "main" + data.getInitialNode() + ".log";
+        String logFile = logDir + "main" + id + ".log";
+        PrintWriter out1 = null;
+        PrintWriter out2 = null;
+        try {
+            out1 = new PrintWriter(new FileWriter(allLogFile, true));
+            out2 = new PrintWriter(new FileWriter(logFile, true));
+            String msgType = isRoot() ? D2TreeMessageT.toString(data
+                    .getSourceType()) + "\n" : "";
+            for (D2TreeCore peer : peers) {
+                out1.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(),
+                        peer.id);
+                peer.rt.print(out1);
+                out2.format("%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(),
+                        peer.id);
+                peer.rt.print(out2);
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        out1.close();
+        out2.close();
 	}
     boolean isLeaf(){
     	//leaves don't have children or a representative
