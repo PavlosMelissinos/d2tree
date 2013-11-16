@@ -1,6 +1,6 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * To change this template, choose Tools | Templates and open the template in
+ * the editor.
  */
 
 package d2tree;
@@ -18,17 +18,22 @@ public class RoutingTable {
 
     public static enum Role {
         // base tree
-        LEFT_CHILD, RIGHT_CHILD, PARENT,
+        LEFT_CHILD,
+        RIGHT_CHILD,
+        PARENT,
         // level groups
-        LEFT_RT, RIGHT_RT,
+        LEFT_RT,
+        RIGHT_RT,
         // adjacency
-        LEFT_A_NODE, RIGHT_A_NODE,
+        LEFT_A_NODE,
+        RIGHT_A_NODE,
         // buckets
-        BUCKET_NODE, REPRESENTATIVE;
+        BUCKET_NODE,
+        REPRESENTATIVE;
     };
 
-    private ArrayList<Long> leftRT;
-    private ArrayList<Long> rightRT;
+    private ArrayList<Long>     leftRT;
+    private ArrayList<Long>     rightRT;
     private HashMap<Role, Long> visiblePeers;
 
     RoutingTable() {
@@ -47,14 +52,12 @@ public class RoutingTable {
         case LEFT_RT:
             while (index >= leftRT.size())
                 leftRT.add(DEF_VAL);
-            if (leftRT.get(index) == DEF_VAL)
-                leftRT.set(index, value);
+            if (leftRT.get(index) == DEF_VAL) leftRT.set(index, value);
             break;
         case RIGHT_RT:
             while (index >= rightRT.size())
                 rightRT.add(DEF_VAL);
-            if (rightRT.get(index) == DEF_VAL)
-                rightRT.set(index, value);
+            if (rightRT.get(index) == DEF_VAL) rightRT.set(index, value);
             break;
         default:
             set(role, value);
@@ -65,8 +68,8 @@ public class RoutingTable {
         assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
         if (value == DEF_VAL) {
             throw new IllegalArgumentException();
-        } else
-            this.visiblePeers.put(role, value);
+        }
+        else this.visiblePeers.put(role, value);
     }
 
     void unset(Role role, int index, long oldValue) {
@@ -93,10 +96,8 @@ public class RoutingTable {
 
     void unset(Role role) {
         assert role == Role.LEFT_RT || role == Role.RIGHT_RT;
-        if (role == Role.LEFT_RT)
-            leftRT.clear();
-        else if (role == Role.RIGHT_RT)
-            rightRT.clear();
+        if (role == Role.LEFT_RT) leftRT.clear();
+        else if (role == Role.RIGHT_RT) rightRT.clear();
     }
 
     // void setRT(Role role, ArrayList<Long> values){
@@ -118,13 +119,12 @@ public class RoutingTable {
     long get(Role role, int index) {
         long value = DEF_VAL;
         if (role == Role.LEFT_RT) {
-            if (index < this.leftRT.size())
-                value = this.leftRT.get(index);
-        } else if (role == Role.RIGHT_RT) {
-            if (index < this.rightRT.size())
-                value = this.rightRT.get(index);
-        } else
-            value = get(role);
+            if (index < this.leftRT.size()) value = this.leftRT.get(index);
+        }
+        else if (role == Role.RIGHT_RT) {
+            if (index < this.rightRT.size()) value = this.rightRT.get(index);
+        }
+        else value = get(role);
         return value;
     }
 
@@ -135,12 +135,9 @@ public class RoutingTable {
     }
 
     boolean contains(Role role, int index) {
-        if (role == Role.LEFT_RT)
-            return this.leftRT.contains(index);
-        else if (role == Role.RIGHT_RT)
-            return this.rightRT.contains(index);
-        else
-            return contains(role);
+        if (role == Role.LEFT_RT) return this.leftRT.contains(index);
+        else if (role == Role.RIGHT_RT) return this.rightRT.contains(index);
+        else return contains(role);
     }
 
     boolean contains(Role role) {
@@ -150,12 +147,9 @@ public class RoutingTable {
     }
 
     boolean isEmpty(Role role) {
-        if (role == Role.LEFT_RT)
-            return this.leftRT.isEmpty();
-        else if (role == Role.RIGHT_RT)
-            return this.rightRT.isEmpty();
-        else
-            throw new IllegalArgumentException();
+        if (role == Role.LEFT_RT) return this.leftRT.isEmpty();
+        else if (role == Role.RIGHT_RT) return this.rightRT.isEmpty();
+        else throw new IllegalArgumentException();
     }
 
     int size() {
@@ -166,12 +160,9 @@ public class RoutingTable {
     }
 
     int size(Role role) {
-        if (role == Role.LEFT_RT)
-            return this.leftRT.size();
-        else if (role == Role.RIGHT_RT)
-            return this.rightRT.size();
-        else
-            throw new IllegalArgumentException();
+        if (role == Role.LEFT_RT) return this.leftRT.size();
+        else if (role == Role.RIGHT_RT) return this.rightRT.size();
+        else throw new IllegalArgumentException();
     }
 
     long getHeight() {
@@ -180,21 +171,21 @@ public class RoutingTable {
 
     void print(PrintWriter out) {
         out.format(
+                // "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, RT = [",
                 "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, LRT = [",
                 get(Role.PARENT), get(Role.LEFT_CHILD), get(Role.RIGHT_CHILD),
                 get(Role.LEFT_A_NODE), get(Role.RIGHT_A_NODE),
                 get(Role.BUCKET_NODE), get(Role.REPRESENTATIVE));
+        // ArrayList<Long> inverseLeftRT = new ArrayList<Long>(leftRT);
+        // Collections.reverse(inverseLeftRT);
         for (Long node : leftRT) {
             out.format("%3d ", node);
         }
-        // if (getLeftRT().isEmpty()) out.print("    ");
         out.print("], RRT = [");
+        // out.print(", -, ");
         for (Long node : rightRT) {
             out.format("%3d ", node);
         }
-        // if (getRightRT().isEmpty()) out.print("    ");
         out.println("]");
-
-        // out.println(", LRT = " + getLeftRT() + ", RRT = " + getRightRT());
     }
 }

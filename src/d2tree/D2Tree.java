@@ -9,13 +9,13 @@ import p2p.simulator.protocol.Peer;
 
 public class D2Tree extends Peer {
 
-    private Network Net;
-    private D2TreeCore Core;
-    private long Id;
+    private Network      Net;
+    private D2TreeCore   Core;
+    private long         Id;
     private Thread.State state;
-    private boolean isOnline;
-    private int pendingQueries;
-    private int introducer;
+    private boolean      isOnline;
+    private int          pendingQueries;
+    private int          introducer;
 
     @Override
     public void init(long id, long n, long k, Network Net) {
@@ -28,8 +28,7 @@ public class D2Tree extends Peer {
         this.pendingQueries = 0;
         this.introducer = 1;
 
-        if (id == 1)
-            isOnline = true;
+        if (id == 1) isOnline = true;
     }
 
     @Override
@@ -37,8 +36,7 @@ public class D2Tree extends Peer {
 
         Message msg;
 
-        if ((msg = Net.recvMsg(Id)) != null)
-            resolveMessage(msg);
+        if ((msg = Net.recvMsg(Id)) != null) resolveMessage(msg);
 
         this.state = Thread.State.TERMINATED;
     }
