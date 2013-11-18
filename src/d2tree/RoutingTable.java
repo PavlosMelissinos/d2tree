@@ -30,6 +30,38 @@ public class RoutingTable {
         // buckets
         BUCKET_NODE,
         REPRESENTATIVE;
+
+        // boolean isInverse(Role role) {
+        // switch (this) {
+        // case BUCKET_NODE:
+        // return role == REPRESENTATIVE;
+        // break;
+        // case PARENT:
+        // return role == LEFT_CHILD || role == RIGHT_CHILD;
+        // break;
+        // case LEFT_A_NODE:
+        // return role == RIGHT_A_NODE;
+        // break;
+        // case LEFT_CHILD:
+        // return role == PARENT;
+        // break;
+        // case REPRESENTATIVE:
+        // return role == BUCKET_NODE;
+        // break;
+        // case LEFT_RT:
+        // while (index >= leftRT.size())
+        // leftRT.add(DEF_VAL);
+        // if (leftRT.get(index) == DEF_VAL) leftRT.set(index, value);
+        // break;
+        // case RIGHT_RT:
+        // while (index >= rightRT.size())
+        // rightRT.add(DEF_VAL);
+        // if (rightRT.get(index) == DEF_VAL) rightRT.set(index, value);
+        // break;
+        // default:
+        // set(role, value);
+        // }
+        // }
     };
 
     private ArrayList<Long>     leftRT;
@@ -89,8 +121,8 @@ public class RoutingTable {
 
     void unset(Role role, long oldValue) {
         assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
-        if (this.visiblePeers.containsKey(role)
-                && this.visiblePeers.get(role) == oldValue)
+        if (this.visiblePeers.containsKey(role) &&
+                this.visiblePeers.get(role) == oldValue)
             this.visiblePeers.remove(role);
     }
 
@@ -142,8 +174,8 @@ public class RoutingTable {
 
     boolean contains(Role role) {
         assert role != Role.LEFT_RT && role != Role.RIGHT_RT;
-        return visiblePeers.containsKey(role)
-                && visiblePeers.get(role) != DEF_VAL;
+        return visiblePeers.containsKey(role) &&
+                visiblePeers.get(role) != DEF_VAL;
     }
 
     boolean isEmpty(Role role) {
@@ -178,12 +210,15 @@ public class RoutingTable {
                 get(Role.BUCKET_NODE), get(Role.REPRESENTATIVE));
         // ArrayList<Long> inverseLeftRT = new ArrayList<Long>(leftRT);
         // Collections.reverse(inverseLeftRT);
-        for (Long node : leftRT) {
+        for (int index = 0; index < leftRT.size(); index++) {
+            long node = leftRT.get(index);
             out.format("%3d ", node);
         }
         out.print("], RRT = [");
         // out.print(", -, ");
-        for (Long node : rightRT) {
+        // TODO changes in routing tables
+        for (int index = 0; index < rightRT.size(); index++) {
+            long node = rightRT.get(index);
             out.format("%3d ", node);
         }
         out.println("]");
