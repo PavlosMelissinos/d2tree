@@ -1,11 +1,13 @@
 package d2tree;
 
 import java.lang.Thread.State;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 import p2p.simulator.message.Message;
 import p2p.simulator.network.Network;
 import p2p.simulator.protocol.Peer;
+import d2tree.RoutingTable.Role;
 
 public class D2Tree extends Peer {
 
@@ -44,68 +46,97 @@ public class D2Tree extends Peer {
     private void resolveMessage(Message msg) {
 
         int mType;
-
+        Core.print(msg, "Node " + msg.getDestinationId() +
+                " received message from " + msg.getSourceId(),
+                D2TreeCore.logDir + "messages.txt", msg.getSourceId());
         mType = msg.getType();
 
+        HashMap<Role, Integer> oldInconsistencies = Core
+                .findRTInconsistencies(false);
+        // boolean isInconsistent = false;
+        // Core.findRTInconsistencies();
         switch (mType) {
         case D2TreeMessageT.JOIN_REQ:
             Core.forwardJoinRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
+            break;
+        case D2TreeMessageT.JOIN_RES:
+            Core.forwardJoinResponse(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
+            isOnline = true;
             break;
         case D2TreeMessageT.CONNECT_MSG:
             Core.connect(msg);
-            isOnline = true;
+            Core.findRTInconsistencies(true, oldInconsistencies);
+            // isOnline = true;
             break;
         case D2TreeMessageT.REDISTRIBUTE_REQ:
             Core.forwardBucketRedistributionRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.REDISTRIBUTE_RES:
             Core.forwardBucketRedistributionResponse(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.GET_SUBTREE_SIZE_REQ:
             Core.forwardGetSubtreeSizeRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.GET_SUBTREE_SIZE_RES:
             Core.forwardGetSubtreeSizeResponse(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.CHECK_BALANCE_REQ:
             Core.forwardCheckBalanceRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.EXTEND_CONTRACT_REQ:
             Core.forwardExtendContractRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.EXTEND_REQ:
             Core.forwardExtendRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.EXTEND_RES:
             Core.forwardExtendResponse(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.CONTRACT_REQ:
             Core.forwardContractRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.TRANSFER_REQ:
             Core.forwardTransferRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.TRANSFER_RES:
             Core.forwardTransferResponse(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.DISCONNECT_MSG:
             Core.disconnect(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.LOOKUP_REQ:
             Core.forwardLookupRequest(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.LOOKUP_RES:
             pendingQueries--;
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
         case D2TreeMessageT.PRINT_MSG:
             Core.printTree(msg);
+            Core.findRTInconsistencies(true, oldInconsistencies);
             break;
-        // case D2TreeMessageT.PRINT_RT_MSG:
-        // Core.printRT(msg);
-        // break;
         default:
             System.out.println("Unrecognized message type: " + mType);
         }
+        // if (wasConsistent && isInconsistent) {
+        // // IllegalStateException e = new IllegalStateException();
+        // new Exception().printStackTrace();
+        // }
     }
 
     @Override

@@ -28,40 +28,66 @@ public class RoutingTable {
         LEFT_A_NODE,
         RIGHT_A_NODE,
         // buckets
-        BUCKET_NODE,
+        FIRST_BUCKET_NODE,
+        LAST_BUCKET_NODE,
         REPRESENTATIVE;
 
-        // boolean isInverse(Role role) {
-        // switch (this) {
-        // case BUCKET_NODE:
-        // return role == REPRESENTATIVE;
-        // break;
-        // case PARENT:
-        // return role == LEFT_CHILD || role == RIGHT_CHILD;
-        // break;
-        // case LEFT_A_NODE:
-        // return role == RIGHT_A_NODE;
-        // break;
-        // case LEFT_CHILD:
-        // return role == PARENT;
-        // break;
-        // case REPRESENTATIVE:
-        // return role == BUCKET_NODE;
-        // break;
-        // case LEFT_RT:
-        // while (index >= leftRT.size())
-        // leftRT.add(DEF_VAL);
-        // if (leftRT.get(index) == DEF_VAL) leftRT.set(index, value);
-        // break;
-        // case RIGHT_RT:
-        // while (index >= rightRT.size())
-        // rightRT.add(DEF_VAL);
-        // if (rightRT.get(index) == DEF_VAL) rightRT.set(index, value);
-        // break;
-        // default:
-        // set(role, value);
-        // }
-        // }
+        static Role mirrorRole(Role role) {
+            Role reverseRole = null;
+            switch (role) {
+            case FIRST_BUCKET_NODE:
+                reverseRole = REPRESENTATIVE;
+                break;
+            case LAST_BUCKET_NODE:
+                reverseRole = REPRESENTATIVE;
+                break;
+            case PARENT:
+                reverseRole = LEFT_CHILD;
+                break;
+            case LEFT_CHILD:
+                reverseRole = PARENT;
+                break;
+            case RIGHT_CHILD:
+                reverseRole = PARENT;
+                break;
+            case LEFT_A_NODE:
+                reverseRole = RIGHT_A_NODE;
+                break;
+            case RIGHT_A_NODE:
+                reverseRole = LEFT_A_NODE;
+                break;
+            case REPRESENTATIVE:
+                reverseRole = FIRST_BUCKET_NODE;
+                break;
+            case LEFT_RT:
+                reverseRole = RIGHT_RT;
+                break;
+            case RIGHT_RT:
+                reverseRole = LEFT_RT;
+                break;
+            default:
+                reverseRole = null;
+                break;
+            }
+            return reverseRole;
+        }
+
+        static Role mirrorRole2(Role role) {
+            Role reverseRole = null;
+            switch (role) {
+            case PARENT:
+                reverseRole = RIGHT_CHILD;
+                break;
+            case REPRESENTATIVE:
+                reverseRole = LAST_BUCKET_NODE;
+                break;
+            default:
+                reverseRole = null;
+                break;
+            }
+            return reverseRole;
+        }
+
     };
 
     private ArrayList<Long>     leftRT;
@@ -202,25 +228,24 @@ public class RoutingTable {
     }
 
     void print(PrintWriter out) {
-        out.format(
-                // "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, RT = [",
-                "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, BN = %3d, RN = %3d, LRT = [",
-                get(Role.PARENT), get(Role.LEFT_CHILD), get(Role.RIGHT_CHILD),
-                get(Role.LEFT_A_NODE), get(Role.RIGHT_A_NODE),
-                get(Role.BUCKET_NODE), get(Role.REPRESENTATIVE));
-        // ArrayList<Long> inverseLeftRT = new ArrayList<Long>(leftRT);
-        // Collections.reverse(inverseLeftRT);
-        for (int index = 0; index < leftRT.size(); index++) {
+        String lRT = "";
+        for (int index = leftRT.size() - 1; index >= 0; index--) {
             long node = leftRT.get(index);
-            out.format("%3d ", node);
+            lRT += node + ", ";
         }
-        out.print("], RRT = [");
-        // out.print(", -, ");
-        // TODO changes in routing tables
+        String rRT = "";
         for (int index = 0; index < rightRT.size(); index++) {
             long node = rightRT.get(index);
-            out.format("%3d ", node);
+            rRT += ", " + node;
         }
-        out.println("]");
+        out.format(
+                "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, FBN = %3d, LBN = %3d, RN = %3d, RT = [%s-%s]",
+                // "P = %3d, LC = %3d, RC = %3d, LA = %3d, RA = %3d, FBN = %3d, LBN = %3d, RN = %3d, LRT = [",
+                get(Role.PARENT), get(Role.LEFT_CHILD), get(Role.RIGHT_CHILD),
+                get(Role.LEFT_A_NODE), get(Role.RIGHT_A_NODE),
+                get(Role.FIRST_BUCKET_NODE), get(Role.LAST_BUCKET_NODE),
+                get(Role.REPRESENTATIVE), lRT, rRT);
+        // out.print("], RRT = [");
+        // TODO changes in routing tables
     }
 }
