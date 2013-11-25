@@ -899,7 +899,7 @@ public class D2TreeCore {
                         data.getInitialNode()));
 
                 printTree(msg);
-                findRTInconsistencies(true);
+                findRTInconsistencies();
             }
         }
     }
@@ -1874,7 +1874,7 @@ public class D2TreeCore {
         }
     }
 
-    HashMap<Role, Integer> findRTInconsistencies(boolean printStack) {
+    HashMap<Role, Integer> findRTInconsistencies() {
         // scan the network to find out if links to peers check out
         long peer = RoutingTable.DEF_VAL;
         RoutingTable peerRT = null;
@@ -1929,7 +1929,7 @@ public class D2TreeCore {
 
     HashMap<Role, Integer> findRTInconsistencies(boolean printStack,
             HashMap<Role, Integer> oldInconsistencies) {
-        HashMap<Role, Integer> newInconsistencies = findRTInconsistencies(false);
+        HashMap<Role, Integer> newInconsistencies = findRTInconsistencies();
         HashMap<Role, Integer> inconsistenciesDiff = new HashMap<Role, Integer>();
         for (Role role : newInconsistencies.keySet()) {
             if (!oldInconsistencies.containsKey(role))
@@ -1948,20 +1948,62 @@ public class D2TreeCore {
             Role mirrorRole2 = Role.mirrorRole2(role);
             long mirrorPeer = peerRT.get(mirrorRole, 0);
             long mirrorPeer2 = peerRT.get(mirrorRole2, 0);
-            if (id == mirrorPeer) continue;
+            if (id == mirrorPeer || id == mirrorPeer) continue;
+            printText = "Peer " + peer + " shouldn't be " + id + "'s " + role +
+                    "(" + index + "). Alternatively, " + id + " should be ";
+            if (role == Role.REPRESENTATIVE) {
+                printText += "in " + peer + "'s bucket.";
+            }
+            else {
+                printText += peer + "'s " + mirrorRole + "(" + index +
+                        ") instead of " + mirrorPeer;
+                if (mirrorRole2 != null)
+                    printText += " or " + mirrorRole2 + " instead of " +
+                            mirrorPeer2;
+            }
             // String logFile = logDir + "errors" + id + ".txt";
             String logFile = logDir + "errors.txt";
-            printText = "Peer " + peer + " shouldn't be " + id + "'s " + role +
-                    "(" + index + "). Alternatively, " + id + " should be " +
-                    peer + "'s " + mirrorRole + "(" + index + ") instead of " +
-                    mirrorPeer;
-            if (mirrorRole2 != null)
-                printText += " or " + mirrorRole2 + " instead of " +
-                        mirrorPeer2;
             // printText += "\n";
             print(msg, printText, logFile, id);
             if (printStack)
                 new IllegalStateException(printText).printStackTrace();
+        }
+        return inconsistenciesDiff;
+    }
+
+    HashMap<Role, Integer> findFixedRTInconsistencies(
+            HashMap<Role, Integer> oldInconsistencies) {
+        HashMap<Role, Integer> newInconsistencies = findRTInconsistencies();
+        HashMap<Role, Integer> inconsistenciesDiff = new HashMap<Role, Integer>();
+        for (Role role : oldInconsistencies.keySet()) {
+            if (!newInconsistencies.containsKey(role))
+                inconsistenciesDiff.put(role, oldInconsistencies.get(role));
+        }
+
+        Message msg = new Message(id, id, new PrintMessage(
+                D2TreeMessageT.PRINT_ERR_MSG, id));
+        printTree(msg);
+        for (Entry<Role, Integer> entry : inconsistenciesDiff.entrySet()) {
+            Role role = entry.getKey();
+            int index = entry.getValue();
+            long peer = rt.get(role, 0);
+            RoutingTable peerRT = routingTables.get(peer);
+            Role mirrorRole = Role.mirrorRole(role);
+            Role mirrorRole2 = Role.mirrorRole2(role);
+            long mirrorPeer = peerRT.get(mirrorRole, 0);
+            long mirrorPeer2 = peerRT.get(mirrorRole2, 0);
+            if (id != mirrorPeer && id != mirrorPeer) continue;
+            // String logFile = logDir + "errors" + id + ".txt";
+            String logFile = logDir + "errors.txt";
+            printText = "Discrepancy for peer " + peer +
+                    " has been fixed. Its " + mirrorRole +
+                    " has been replaced by node " + mirrorPeer +
+                    " in a consistent relationship";
+            if (mirrorRole2 != null)
+                printText += " (or " + mirrorRole2 + " by " + mirrorPeer2 +
+                        ").";
+            // printText += "\n";
+            print(msg, printText, logFile, id);
         }
         return inconsistenciesDiff;
     }
