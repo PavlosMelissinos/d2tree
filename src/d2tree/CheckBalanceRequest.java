@@ -13,11 +13,11 @@ public class CheckBalanceRequest extends MessageBody {
         this.initialNode = initialNode;
     }
 
-    long getInitialNode() {
+    public long getInitialNode() {
         return initialNode;
     }
 
-    long getTotalBucketSize() {
+    public long getTotalBucketSize() {
         return totalBucketSize;
     }
 

@@ -11,16 +11,16 @@ import p2p.simulator.message.MessageBody;
  * 
  * @author Pavlos Melissinos
  */
-class JoinResponse extends MessageBody {
+public class JoinResponse extends MessageBody {
     private static final long serialVersionUID = 5322337532327918893L;
 
     private long              lastBucketNode;
 
-    JoinResponse(long lastBucketNode) {
+    public JoinResponse(long lastBucketNode) {
         this.lastBucketNode = lastBucketNode;
     }
 
-    long getLastBucketNode() {
+    public long getLastBucketNode() {
         return this.lastBucketNode;
     }
 

@@ -11,6 +11,7 @@ public class D2Tree extends Peer {
 
     private Network      Net;
     private D2TreeCore   Core;
+    // private D2TreeRedistributionCore redistCore;
     private long         Id;
     private Thread.State state;
     private boolean      isOnline;
@@ -25,6 +26,7 @@ public class D2Tree extends Peer {
         this.isOnline = false;
         this.state = Thread.State.NEW;
         this.Core = new D2TreeCore(Id, Net);
+        // this.redistCore = new D2TreeRedistributionCore(Id, Net);
         this.pendingQueries = 0;
         this.introducer = 1;
 
@@ -56,73 +58,55 @@ public class D2Tree extends Peer {
         switch (mType) {
         case D2TreeMessageT.JOIN_REQ:
             Core.forwardJoinRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.JOIN_RES:
             Core.forwardJoinResponse(msg);
-            // postActionCheck(oldInconsistencies, mType);
             isOnline = true;
             break;
         case D2TreeMessageT.CONNECT_MSG:
             Core.connect(msg);
-            // postActionCheck(oldInconsistencies, mType);
-            // isOnline = true;
             break;
         case D2TreeMessageT.REDISTRIBUTE_REQ:
             Core.forwardBucketRedistributionRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.REDISTRIBUTE_RES:
             Core.forwardBucketRedistributionResponse(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.GET_SUBTREE_SIZE_REQ:
             Core.forwardGetSubtreeSizeRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.GET_SUBTREE_SIZE_RES:
             Core.forwardGetSubtreeSizeResponse(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.CHECK_BALANCE_REQ:
             Core.forwardCheckBalanceRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.EXTEND_CONTRACT_REQ:
             Core.forwardExtendContractRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.EXTEND_REQ:
             Core.forwardExtendRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.EXTEND_RES:
             Core.forwardExtendResponse(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.CONTRACT_REQ:
             Core.forwardContractRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.TRANSFER_REQ:
             Core.forwardTransferRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.TRANSFER_RES:
             Core.forwardTransferResponse(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.DISCONNECT_MSG:
             Core.disconnect(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.LOOKUP_REQ:
             Core.forwardLookupRequest(msg);
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.LOOKUP_RES:
             pendingQueries--;
-            // postActionCheck(oldInconsistencies, mType);
             break;
         case D2TreeMessageT.PRINT_MSG:
             D2TreeCore.printTree(msg);
@@ -130,17 +114,7 @@ public class D2Tree extends Peer {
         default:
             System.out.println("Unrecognized message type: " + mType);
         }
-        // if (wasConsistent && isInconsistent) {
-        // // IllegalStateException e = new IllegalStateException();
-        // new Exception().printStackTrace();
-        // }
     }
-
-    // void postActionCheck(HashMap<Role, Integer> oldInconsistencies, int
-    // msgType) {
-    // Core.findRTInconsistencies(true, oldInconsistencies, msgType);
-    // Core.findFixedRTInconsistencies(oldInconsistencies);
-    // }
 
     @Override
     public long getPeerId() {

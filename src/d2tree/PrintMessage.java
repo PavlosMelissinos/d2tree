@@ -31,7 +31,7 @@ public class PrintMessage extends MessageBody {
         this.msgType = msgType;
     }
 
-    long getInitialNode() {
+    public long getInitialNode() {
         return initialNode;
     }
 
@@ -50,7 +50,11 @@ public class PrintMessage extends MessageBody {
     static public synchronized void print(Message msg, String printText,
             String logFile) {
         try {
-            System.out.println("Saving log to " + logFile);
+            if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
+                    !logFile.equals(PrintMessage.logDir + "conn-disconn.txt") &&
+                    !logFile.equals(PrintMessage.logDir + "messages.txt")) {
+                System.out.println("Saving log to " + logFile);
+            }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
 
             // PrintMessage data = (PrintMessage) msg.getData();
@@ -63,13 +67,14 @@ public class PrintMessage extends MessageBody {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-
     }
 
     static public synchronized void print(Message msg, String printText,
             String logFile, long initialNode) {
         try {
-            System.out.println("Saving log to " + logFile);
+            if (!logFile.equals(PrintMessage.logDir + "errors.txt")) {
+                System.out.println("Saving log to " + logFile);
+            }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
 
             // PrintMessage data = (PrintMessage) msg.getData();

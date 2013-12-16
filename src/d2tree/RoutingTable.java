@@ -181,22 +181,6 @@ public class RoutingTable {
                 PrintMessage.logDir + "conn-disconn.txt");
     }
 
-    // void setRT(Role role, ArrayList<Long> values){
-    // if (role == Role.LEFT_RT){
-    // this.leftRT = values;
-    // }
-    // else if (role == Role.RIGHT_RT){
-    // this.rightRT = values;
-    // }
-    // else throw new IllegalArgumentException();
-    // }
-    // void setLeftRT(Vector<Long> values) {
-    // this.leftRT = values;
-    // }
-    //
-    // void setRightRT(Vector<Long> values) {
-    // this.rightRT = values;
-    // }
     long get(Role role, int index) {
         long value = DEF_VAL;
         if (role == Role.LEFT_RT) {
@@ -278,32 +262,6 @@ public class RoutingTable {
             return getBucketNodes(peer).contains(id) || mirrorPeer == id ||
                     mirrorPeer2 == id;
         return mirrorPeer == id || mirrorPeer2 == id;
-    }
-
-    private boolean wasConsistent(Role role, int index, long oldPeer) {
-        HashMap<Role, Long> disc = discrepancies.get(id);
-        // HashMap<Role, Long> oldPeerDiscrepancies =
-        // discrepancies.get(oldPeer);
-        if (oldPeer == DEF_VAL) return !disc.containsKey(role);
-        RoutingTable oldPeerRT = D2TreeCore.routingTables.get(oldPeer);
-        Role mirrorRole = Role.mirrorRole(role);
-        Long mirrorPeer = oldPeerRT.get(mirrorRole, index);
-        Role mirrorRole2 = Role.mirrorRole2(role);
-        Long mirrorPeer2 = oldPeerRT.get(mirrorRole2, index);
-        Long inconsistentPeer = disc.get(role);
-        // assert inconsistentPeer != null;
-        assert mirrorPeer != null;
-        assert mirrorPeer2 != null;
-        if (inconsistentPeer != Long.valueOf(oldPeer) &&
-                mirrorPeer != Long.valueOf(id)) return true;
-        if (inconsistentPeer == Long.valueOf(oldPeer) &&
-                mirrorPeer == Long.valueOf(id)) return true;
-        if (inconsistentPeer != Long.valueOf(oldPeer) &&
-                mirrorPeer2 != Long.valueOf(id)) return true;
-        if (inconsistentPeer == Long.valueOf(oldPeer) &&
-                mirrorPeer2 == Long.valueOf(id)) return true;
-        return false;
-
     }
 
     private void updateInconsistencies(Role role, int index, long oldPeer) {

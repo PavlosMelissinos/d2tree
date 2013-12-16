@@ -16,15 +16,15 @@ public class ExtendContractRequest extends MessageBody {
         this.totalBucketNodes = totalBucketNodes;
     }
 
-    long getInitialNode() {
+    public long getInitialNode() {
         return initialNode;
     }
 
-    long getHeight() {
+    public long getHeight() {
         return this.height;
     }
 
-    long getTotalBucketNodes() {
+    public long getTotalBucketNodes() {
         return this.totalBucketNodes;
     }
 
