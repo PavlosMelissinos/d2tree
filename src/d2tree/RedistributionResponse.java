@@ -7,11 +7,14 @@ public class RedistributionResponse extends MessageBody {
     private static final long serialVersionUID = -1704533667370020587L;
     private long              destNode;
     private long              destSize;
+    private long              uncheckedBucketNodes;
     private long              initialNode;
 
-    public RedistributionResponse(long destNode, long destSize, long initialNode) {
+    public RedistributionResponse(long destNode, long destSize,
+            long uncheckedBucketNodes, long initialNode) {
         this.destNode = destNode;
         this.destSize = destSize;
+        this.uncheckedBucketNodes = uncheckedBucketNodes;
         this.initialNode = initialNode;
     }
 
@@ -21,6 +24,10 @@ public class RedistributionResponse extends MessageBody {
 
     public long getDestSize() {
         return this.destSize;
+    }
+
+    public long getUncheckedBucketNodes() {
+        return this.uncheckedBucketNodes;
     }
 
     public long getInitialNode() {

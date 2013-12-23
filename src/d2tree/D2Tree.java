@@ -66,6 +66,9 @@ public class D2Tree extends Peer {
         case D2TreeMessageT.CONNECT_MSG:
             Core.connect(msg);
             break;
+        case D2TreeMessageT.REDISTRIBUTE_SETUP_REQ:
+            Core.forwardBucketPreRedistributionRequest(msg);
+            break;
         case D2TreeMessageT.REDISTRIBUTE_REQ:
             Core.forwardBucketRedistributionRequest(msg);
             break;

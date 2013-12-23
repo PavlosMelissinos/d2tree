@@ -13,7 +13,7 @@ public class RedistributionRequest extends MessageBody {
     private long              transferDest;
     private long              destOffset;
     private long              initialNode;
-    private long              pivotDiff;
+    private long              pivotBucketSize;
 
     public RedistributionRequest(long totalUncheckedBucketNodes,
             long totalUncheckedBuckets, long subtreeID, long initialNode) {
@@ -23,7 +23,7 @@ public class RedistributionRequest extends MessageBody {
         transferDest = DEF_VAL;
         this.initialNode = initialNode;
         destOffset = 0;
-        pivotDiff = 0;
+        pivotBucketSize = 0;
     }
 
     public long getTotalUncheckedBucketNodes() {
@@ -46,8 +46,16 @@ public class RedistributionRequest extends MessageBody {
         return transferDest;
     }
 
-    public long getPivotDiff() {
-        return pivotDiff;
+    public long getPivotBucketSize() {
+        return pivotBucketSize;
+    }
+
+    // public long getPivotDiff() {
+    // return pivotDiff;
+    // }
+
+    public void setTotalUncheckedBucketNodes(long number) {
+        this.totalUncheckedBucketNodes = number;
     }
 
     public void setTransferDest(long dest) {
@@ -59,9 +67,13 @@ public class RedistributionRequest extends MessageBody {
         this.destOffset = destOffset;
     }
 
-    public void setPivotDiff(long diff) {
-        this.pivotDiff = diff;
+    public void setPivotBucketSize(long size) {
+        this.pivotBucketSize = size;
     }
+
+    // public void setPivotDiff(long diff) {
+    // this.pivotDiff = diff;
+    // }
 
     public long getDestIndex() {
         return totalUncheckedBuckets - this.destOffset;
