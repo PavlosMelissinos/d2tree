@@ -1113,9 +1113,12 @@ public class D2TreeCore {
                         " is its new representative. Routing table has been built.";
                 this.print(msg, data.getInitialNode());
 
-                ExtendResponse exData = new ExtendResponse(counter -
-                        optimalBucketSize - 1, data.getInitialNode());
-                send(new Message(id, newLeaf, exData));
+                // ExtendResponse exData = new ExtendResponse(counter -
+                // optimalBucketSize - 1, data.getInitialNode());
+                // send(new Message(id, newLeaf, exData));
+                // GetSubtreeSizeRequest sizeData = new GetSubtreeSizeRequest(
+                // Mode.CHECK_BALANCE, data.getInitialNode());
+                // send(new Message(oldLeaf, newLeaf, sizeData));
 
                 // disconnect the last bucket node of the old leaf
                 DisconnectMessage discData = new DisconnectMessage(id,
