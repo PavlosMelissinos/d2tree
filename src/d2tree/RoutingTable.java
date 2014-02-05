@@ -8,6 +8,7 @@ package d2tree;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import p2p.simulator.message.Message;
 
@@ -57,11 +58,11 @@ public class RoutingTable {
 
     };
 
-    private ArrayList<Long>                          leftRT;
-    private ArrayList<Long>                          rightRT;
-    private HashMap<Role, Long>                      visiblePeers;
-    private long                                     id;
-    public static HashMap<Long, HashMap<Role, Long>> discrepancies;
+    private ArrayList<Long>                                    leftRT;
+    private ArrayList<Long>                                    rightRT;
+    private HashMap<Role, Long>                                visiblePeers;
+    private long                                               id;
+    public static ConcurrentHashMap<Long, HashMap<Role, Long>> discrepancies;
 
     RoutingTable(long id) {
         this.leftRT = new ArrayList<Long>();
@@ -69,7 +70,7 @@ public class RoutingTable {
         this.visiblePeers = new HashMap<Role, Long>();
         this.id = id;
         if (discrepancies == null)
-            discrepancies = new HashMap<Long, HashMap<Role, Long>>();
+            discrepancies = new ConcurrentHashMap<Long, HashMap<Role, Long>>();
         discrepancies.put(id, new HashMap<Role, Long>());
     }
 
@@ -265,18 +266,18 @@ public class RoutingTable {
     }
 
     private void updateInconsistencies(Role role, int index, long oldPeer) {
-        long peer = get(role, index);
-        // RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
-        Role mirrorRole = Role.mirrorRole(role);
-        Role mirrorRole2 = Role.mirrorRole2(role);
-
-        if (peer == oldPeer) return;
-        updateInconsistencies(id, role, index, oldPeer);
-        updateInconsistencies(peer, mirrorRole, index, DEF_VAL);
-        updateInconsistencies(peer, mirrorRole2, index, DEF_VAL);
-        updateInconsistencies(oldPeer, mirrorRole, index, DEF_VAL);
-        updateInconsistencies(oldPeer, mirrorRole2, index, DEF_VAL);
-        printDiscrepancies();
+        // long peer = get(role, index);
+        // // RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
+        // Role mirrorRole = Role.mirrorRole(role);
+        // Role mirrorRole2 = Role.mirrorRole2(role);
+        //
+        // if (peer == oldPeer) return;
+        // updateInconsistencies(id, role, index, oldPeer);
+        // updateInconsistencies(peer, mirrorRole, index, DEF_VAL);
+        // updateInconsistencies(peer, mirrorRole2, index, DEF_VAL);
+        // updateInconsistencies(oldPeer, mirrorRole, index, DEF_VAL);
+        // updateInconsistencies(oldPeer, mirrorRole2, index, DEF_VAL);
+        // printDiscrepancies();
     }
 
     private void updateInconsistencies(long myPeer, Role role, int index,
@@ -294,6 +295,9 @@ public class RoutingTable {
         }
         else {
             RoutingTable otherPeerRT = D2TreeCore.routingTables.get(otherPeer);
+            if (otherPeerRT == null)
+                System.err.println("Other peer is " + otherPeer);
+            assert otherPeerRT != null;
             Role mirrorRole = Role.mirrorRole(role);
             Role mirrorRole2 = Role.mirrorRole2(role);
             long mirrorPeer = otherPeerRT.get(mirrorRole, index);

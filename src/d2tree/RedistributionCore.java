@@ -56,18 +56,6 @@ public class RedistributionCore {
         this.uncheckedBucketNodes = uncheckedBucketNodes;
     }
 
-    // public void setUncheckedBuckets(long uncheckedBuckets) {
-    // this.uncheckedBuckets = uncheckedBuckets;
-    // }
-    //
-    // public void setUnevenSubtreeID(long unevenSubtreeID) {
-    // this.unevenSubtreeID = unevenSubtreeID;
-    // }
-    //
-    // public void setSurplus(int surplus) {
-    // this.surplus = surplus;
-    // }
-    //
     public void setDest(long dest) {
         this.dest = dest;
     }
@@ -77,7 +65,6 @@ public class RedistributionCore {
                 this.getSurplus();
         this.uncheckedBuckets = data.getTotalUncheckedBuckets();
         this.unevenSubtreeID = data.getSubtreeID();
-        this.surplus = 0;
     }
 
     public void increaseSurplus() {
@@ -89,7 +76,11 @@ public class RedistributionCore {
     }
 
     public void clear() {
-        this.surplus = 0;
+        clear(false);
+    }
+
+    public void clear(boolean surplusFlag) {
+        if (!surplusFlag) this.surplus = 0;
         this.unevenSubtreeID = DEF_VAL;
         this.dest = DEF_VAL;
         this.uncheckedBucketNodes = 0;
