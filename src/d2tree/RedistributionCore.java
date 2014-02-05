@@ -1,13 +1,16 @@
 package d2tree;
 
-public class RedistributionCore {
+import java.io.Serializable;
+
+public class RedistributionCore implements Serializable {
+    private static final long serialVersionUID = -6125664795857014636L;
     // private HashMap<Key, Long> values;
-    private long        uncheckedBucketNodes;
-    private long        uncheckedBuckets;
-    private long        unevenSubtreeID;
-    private long        surplus;
-    private long        dest;
-    private static long DEF_VAL = -1;
+    private long              uncheckedBucketNodes;
+    private long              uncheckedBuckets;
+    private long              unevenSubtreeID;
+    private long              surplus;
+    private long              dest;
+    private static final long DEF_VAL          = -1;
 
     public static enum Key {
         UNEVEN_SUBTREE_ID,
@@ -79,8 +82,8 @@ public class RedistributionCore {
         clear(false);
     }
 
-    public void clear(boolean surplusFlag) {
-        if (!surplusFlag) this.surplus = 0;
+    public void clear(boolean keepSurplus) {
+        if (!keepSurplus) this.surplus = 0;
         this.unevenSubtreeID = DEF_VAL;
         this.dest = DEF_VAL;
         this.uncheckedBucketNodes = 0;

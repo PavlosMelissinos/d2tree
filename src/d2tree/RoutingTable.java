@@ -6,6 +6,7 @@
 package d2tree;
 
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,8 +17,9 @@ import p2p.simulator.message.Message;
  * 
  * @author Pavlos Melissinos
  */
-public class RoutingTable {
-    public static Long DEF_VAL = -1L;
+public class RoutingTable implements Serializable {
+    private static final long serialVersionUID = 8915233298957316053L;
+    public static final long  DEF_VAL          = -1L;
 
     public static enum Role {
         // base tree
