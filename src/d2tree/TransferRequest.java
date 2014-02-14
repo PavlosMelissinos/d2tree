@@ -8,6 +8,7 @@ public class TransferRequest extends MessageBody {
     private int               passes;
     private long              destBucket;
     private long              pivotBucket;
+    private int               passIndex;
     private long              initialNode;
 
     public TransferRequest(long destBucket, long pivotBucket, int passes,
@@ -15,6 +16,7 @@ public class TransferRequest extends MessageBody {
         this.destBucket = destBucket;
         this.pivotBucket = pivotBucket;
         this.passes = passes;
+        this.passIndex = 1;
         this.initialNode = initialNode;
     }
 
@@ -28,6 +30,14 @@ public class TransferRequest extends MessageBody {
 
     public int getPasses() {
         return this.passes;
+    }
+
+    public void incrementPassIndex() {
+        this.passIndex++;
+    }
+
+    public int getPassIndex() {
+        return this.passIndex;
     }
 
     public long getInitialNode() {

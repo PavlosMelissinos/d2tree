@@ -5,6 +5,8 @@
 
 package d2tree;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -262,24 +264,28 @@ public class RoutingTable implements Serializable {
         Long mirrorPeer = peerRT.get(mirrorRole, index);
         Long mirrorPeer2 = peerRT.get(mirrorRole2, index);
         if (role == Role.REPRESENTATIVE)
-            return getBucketNodes(peer).contains(id) || mirrorPeer == id ||
-                    mirrorPeer2 == id;
+            return DataExtractor.getBucketNodes(peer).contains(id) ||
+                    mirrorPeer == id || mirrorPeer2 == id;
         return mirrorPeer == id || mirrorPeer2 == id;
     }
 
     private void updateInconsistencies(Role role, int index, long oldPeer) {
-        // long peer = get(role, index);
-        // // RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
-        // Role mirrorRole = Role.mirrorRole(role);
-        // Role mirrorRole2 = Role.mirrorRole2(role);
-        //
-        // if (peer == oldPeer) return;
-        // updateInconsistencies(id, role, index, oldPeer);
-        // updateInconsistencies(peer, mirrorRole, index, DEF_VAL);
-        // updateInconsistencies(peer, mirrorRole2, index, DEF_VAL);
-        // updateInconsistencies(oldPeer, mirrorRole, index, DEF_VAL);
-        // updateInconsistencies(oldPeer, mirrorRole2, index, DEF_VAL);
-        // printDiscrepancies();
+
+        boolean flag = true; // set this to true to check for inconsistencies
+        if (flag) {
+            long peer = get(role, index);
+            // RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
+            Role mirrorRole = Role.mirrorRole(role);
+            Role mirrorRole2 = Role.mirrorRole2(role);
+
+            if (peer == oldPeer) return;
+            updateInconsistencies(id, role, index, oldPeer);
+            updateInconsistencies(peer, mirrorRole, index, DEF_VAL);
+            updateInconsistencies(peer, mirrorRole2, index, DEF_VAL);
+            updateInconsistencies(oldPeer, mirrorRole, index, DEF_VAL);
+            updateInconsistencies(oldPeer, mirrorRole2, index, DEF_VAL);
+            printDiscrepancies();
+        }
     }
 
     private void updateInconsistencies(long myPeer, Role role, int index,
@@ -297,16 +303,16 @@ public class RoutingTable implements Serializable {
         }
         else {
             RoutingTable otherPeerRT = D2TreeCore.routingTables.get(otherPeer);
-            if (otherPeerRT == null)
-                System.err.println("Other peer is " + otherPeer);
-            assert otherPeerRT != null;
+            if (otherPeerRT == null) {
+                printText = String.format("Other peer is %d (role %s of %d)\n",
+                        otherPeer, role, myPeer);
+                System.err.print(printText);
+                assert otherPeerRT != null;
+            }
             Role mirrorRole = Role.mirrorRole(role);
             Role mirrorRole2 = Role.mirrorRole2(role);
             long mirrorPeer = otherPeerRT.get(mirrorRole, index);
             long mirrorPeer2 = otherPeerRT.get(mirrorRole2, index);
-            // printText = "DISCREPANCY_ADDE: " + printText + " whereas " +
-            // oldPeer + "." + mirrorRole + " = " + mirrorPeer + " and " +
-            // oldPeer + "." + mirrorRole2 + " = " + mirrorPeer2;
             printText = String
                     .format("DISCREPANCY_ADDE: %s whereas %d.%s = %d / %d.%s = %d (new peer) and %d.%s = %d / %d.%s = %d (old peer)",
                             printText, otherPeer, mirrorRole, mirrorPeer,
@@ -325,23 +331,47 @@ public class RoutingTable implements Serializable {
         PrintMessage.print(msg, printText, logFile, data.getInitialNode());
     }
 
-    static ArrayList<Long> getBucketNodes(long bucket) {
-        ArrayList<Long> bucketNodes = new ArrayList<Long>();
-        RoutingTable rt = D2TreeCore.routingTables.get(bucket);
-        long bucketNode = rt.get(Role.FIRST_BUCKET_NODE);
-        while (bucketNode != DEF_VAL && !bucketNodes.contains(bucketNode)) {
-            bucketNodes.add(bucketNode);
-            rt = D2TreeCore.routingTables.get(bucketNode);
-            bucketNode = rt.get(Role.RIGHT_RT, 0);
-        }
-        return bucketNodes;
-    }
-
     private synchronized void printDiscrepancies() {
         String logFile = PrintMessage.logDir + "errors.txt";
         PrintMessage data = new PrintMessage(D2TreeMessageT.PRINT_ERR_MSG, id);
         Message msg = new Message(id, id, data);
         PrintMessage.print(msg, discrepancies.toString(), logFile);
+    }
+
+    boolean isLeaf() {
+        // leaves don't have children or a representative
+        boolean itIs = !contains(Role.REPRESENTATIVE) &&
+                !contains(Role.LEFT_CHILD) && !contains(Role.RIGHT_CHILD);
+        if (itIs && !contains(Role.FIRST_BUCKET_NODE)) {
+            try {
+                PrintWriter out = new PrintWriter(new FileWriter(
+                        PrintMessage.logDir + "isLeaf.log", true));
+                new RuntimeException().printStackTrace(out);
+                out.print("ID = " + id + ", ");
+                print(out);
+                out.close();
+                Thread.sleep(2000);
+                return !contains(Role.REPRESENTATIVE) &&
+                        !contains(Role.LEFT_CHILD) &&
+                        !contains(Role.RIGHT_CHILD);
+            }
+            catch (IOException | InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        return !contains(Role.REPRESENTATIVE) && !contains(Role.LEFT_CHILD) &&
+                !contains(Role.RIGHT_CHILD);
+    }
+
+    boolean isBucketNode() {
+        // bucketNodes have a representative
+        return contains(Role.REPRESENTATIVE);
+    }
+
+    boolean isRoot() {
+        // the root has no parent and no representative
+        return !contains(Role.PARENT) && !contains(Role.REPRESENTATIVE);
     }
 
     public String toString() {
