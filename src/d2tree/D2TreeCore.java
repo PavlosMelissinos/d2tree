@@ -594,7 +594,8 @@ public class D2TreeCore {
         RedistributionRequest data = (RedistributionRequest) msg.getData();
 
         // get all necessary info
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
+        long surplus = redistCore.getSurplus();
+        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE) - surplus;
         Long uncheckedBucketNodes = data.getTotalUncheckedBucketNodes();
         Long uncheckedBuckets = data.getTotalUncheckedBuckets();
         long subtreeID = redistCore.getUnevenSubtreeID();
@@ -607,13 +608,14 @@ public class D2TreeCore {
         data = new RedistributionRequest(uncheckedBucketNodes - bucketSize,
                 uncheckedBuckets - 1, subtreeID, data.getInitialNode());
 
-        long leftNeighbor = rt.get(Role.LEFT_RT, 0);
+        long newPivotBucket = rt.get(Role.LEFT_RT, 0);
 
-        printText = "This bucket has the right size. Forwarding request to bucket " +
-                leftNeighbor + " (" + uncheckedBuckets + " unchecked buckets).";
+        printText = String.format(
+                "This bucket has the right size (|%d|, %d uncheckedBuckets). "
+                        + "Forwarding request to new pivot bucket %d.",
+                bucketSize, uncheckedBuckets, newPivotBucket);
         this.print(msg, data.getInitialNode());
-        msg = new Message(id, leftNeighbor, data);
-        send(msg);
+        send(new Message(id, newPivotBucket, data));
     }
 
     private void moveDest(Message msg) {
@@ -660,12 +662,11 @@ public class D2TreeCore {
         data.setTransferDest(newDest);
         msg.setDestinationId(newDest);
         msg.setData(data);
-        printText = "Node " +
-                id +
-                " is dest and is ok (size = " +
-                bucketSize +
-                "). Forwarding redistribution request to left neighbor with id = " +
-                rt.get(Role.LEFT_RT, 0) + " which is the new dest bucket...";
+        printText = String
+                .format("Node %d is dest and is ok (size = %d vs %d). "
+                        + "Forwarding redistribution request to lNeighbor with id = %d which is the new dest bucket...",
+                        id, bucketSize, optimalBucketSize,
+                        rt.get(Role.LEFT_RT, 0));
         this.print(msg, data.getInitialNode());
         send(msg);
     }
@@ -692,20 +693,12 @@ public class D2TreeCore {
 
         if (diff == 0 || (diff == 1 && spareNodes > 0)) {
             // pivot bucket is ok, so move to its left neighbor
-            // TODO merge with movePivot
             // TODO is the following line the culprit?
             // redistCore.clear();
-            long newPivotBucket = rt.get(Role.LEFT_RT, 0);
             RedistributionRequest rData = new RedistributionRequest(
-                    uncheckedBucketNodes - bucketSize, uncheckedBuckets - 1,
-                    subtreeID, data.getInitialNode());
-            send(new Message(id, newPivotBucket, rData));
-            printText = String
-                    .format("Bucket %d is ok (|%d|, %d uncheckedBuckets). "
-                            + "Sending a redistribution request to new pivot bucket %d.",
-                            id, bucketSize, uncheckedBuckets, newPivotBucket);
-            this.print(msg, data.getInitialNode());
-            setMode(Mode.NORMAL, data.getInitialNode());
+                    uncheckedBucketNodes, uncheckedBuckets, subtreeID,
+                    data.getInitialNode());
+            movePivot(new Message(id, id, rData));
         }
         else if (diff * destDiff >= 0) {
             // both this bucket and dest have either more or less nodes (or
@@ -794,12 +787,11 @@ public class D2TreeCore {
         // move transferSize nodes from the dest bucket to pivot
         long pivotNode = msg.getSourceId();
         long destNode = id;
-        long oldRepresentative = destBucket; // we're moving destNode from
-                                             // destBucket
-        long newRepresentative = pivotBucket;// to pivotBucket
+        // long oldRepresentative = destBucket; // we're moving destNode from
+        // // destBucket
+        // long newRepresentative = pivotBucket;// to pivotBucket
 
-        printText = String.format(printText, oldRepresentative,
-                newRepresentative);
+        printText = String.format(printText, destBucket, pivotBucket);
         // this.print(msg, transfData.getInitialNode());
 
         long hopsIndex = transfData.getPassIndex();
@@ -808,7 +800,7 @@ public class D2TreeCore {
         assert hopsIndex <= transferSize;
 
         // set pivotBucket as dest node's representative
-        rt.set(Role.REPRESENTATIVE, newRepresentative);
+        rt.set(Role.REPRESENTATIVE, pivotBucket);
 
         // if this is the first time we visit dest, connect its last node to
         // the first node of pivot
@@ -837,28 +829,28 @@ public class D2TreeCore {
                     Role.RIGHT_RT, 0, transfData.getInitialNode());
             send(new Message(id, rt.get(Role.LEFT_RT, 0), discData));
 
-            // set left neighbor as the last bucket node of the dest bucket
-            ConnectMessage connData = new ConnectMessage(
-                    rt.get(Role.LEFT_RT, 0), Role.LAST_BUCKET_NODE, true,
-                    transfData.getInitialNode());
-            send(new Message(id, destBucket, connData));
+            // // set left neighbor as the last bucket node of the dest bucket
+            // ConnectMessage connData = new ConnectMessage(
+            // rt.get(Role.LEFT_RT, 0), Role.LAST_BUCKET_NODE, true,
+            // transfData.getInitialNode());
+            // send(new Message(id, destBucket, connData));
 
-            // set destNode as pivotBucket's first bucket node
-            connData = new ConnectMessage(destNode, Role.FIRST_BUCKET_NODE,
-                    true, transfData.getInitialNode());
-            send(new Message(id, pivotBucket, connData));
-
-            // remove the link from dest node to its left neighbor
-            rt.unset(Role.LEFT_RT);
+            // // set destNode as pivotBucket's first bucket node
+            // connData = new ConnectMessage(destNode, Role.FIRST_BUCKET_NODE,
+            // true, transfData.getInitialNode());
+            // send(new Message(id, pivotBucket, connData));
 
             TransferResponse respData;
             respData = new TransferResponse(-transferSize, pivotBucket,
                     transfData.getInitialNode());
-            send(new Message(id, destBucket, respData));
+            send(new Message(rt.get(Role.LEFT_RT, 0), destBucket, respData));
 
             respData = new TransferResponse(transferSize, pivotBucket,
                     transfData.getInitialNode());
             send(new Message(id, pivotBucket, respData));
+
+            // remove the link from dest node to its left neighbor
+            rt.unset(Role.LEFT_RT);
 
             printText += "Buckets " + destBucket + " and " + pivotBucket +
                     " have been successfully splitted... ";
@@ -888,10 +880,9 @@ public class D2TreeCore {
         // move this node from the pivot bucket to dest
         long destNode = msg.getSourceId();
         long pivotNode = id;
-        long oldRepresentative = pivotBucket;
-        long newRepresentative = destBucket;
-        printText = String.format(printText, oldRepresentative,
-                newRepresentative);
+        // long oldRepresentative = pivotBucket;
+        // long newRepresentative = destBucket;
+        printText = String.format(printText, pivotBucket, destBucket);
         // this.print(msg, transfData.getInitialNode());
 
         long hopsIndex = transfData.getPassIndex();
@@ -900,7 +891,7 @@ public class D2TreeCore {
         assert hopsIndex <= transferSize;
 
         // set dest bucket as pivot node's representative
-        rt.set(Role.REPRESENTATIVE, newRepresentative);
+        rt.set(Role.REPRESENTATIVE, destBucket);
 
         // if this is the first time we visit pivot, connect its first node
         // to the last node of dest
@@ -927,28 +918,29 @@ public class D2TreeCore {
                     Role.LEFT_RT, 0, transfData.getInitialNode());
             send(new Message(id, rt.get(Role.RIGHT_RT, 0), discData));
 
-            // set right neighbor as the first bucket node of the bucket
-            // (pivot)
-            ConnectMessage connData = new ConnectMessage(rt.get(Role.RIGHT_RT,
-                    0), Role.FIRST_BUCKET_NODE, true,
-                    transfData.getInitialNode());
-            send(new Message(id, rt.get(Role.REPRESENTATIVE), connData));
+            // // set right neighbor as the first bucket node of the bucket
+            // // (pivot)
+            // ConnectMessage connData = new
+            // ConnectMessage(rt.get(Role.RIGHT_RT,
+            // 0), Role.FIRST_BUCKET_NODE, true,
+            // transfData.getInitialNode());
+            // send(new Message(id, pivotBucket, connData));
 
-            // set pivotNode as destBucket's last bucket node
-            connData = new ConnectMessage(pivotNode, Role.LAST_BUCKET_NODE,
-                    true, transfData.getInitialNode());
-            send(new Message(id, newRepresentative, connData));
+            // // set pivotNode as destBucket's last bucket node
+            // connData = new ConnectMessage(pivotNode, Role.LAST_BUCKET_NODE,
+            // true, transfData.getInitialNode());
+            // send(new Message(id, destBucket, connData));
+
+            TransferResponse respData = new TransferResponse(-transferSize,
+                    pivotBucket, transfData.getInitialNode());
+            send(new Message(rt.get(Role.RIGHT_RT, 0), pivotBucket, respData));
+
+            respData = new TransferResponse(transferSize, pivotBucket,
+                    transfData.getInitialNode());
+            send(new Message(id, destBucket, respData));
 
             // remove the link from this node to its right neighbor
             rt.unset(Role.RIGHT_RT);
-
-            TransferResponse respData = new TransferResponse(-transferSize,
-                    oldRepresentative, transfData.getInitialNode());
-            send(new Message(id, oldRepresentative, respData));
-
-            respData = new TransferResponse(transferSize, oldRepresentative,
-                    transfData.getInitialNode());
-            send(new Message(id, newRepresentative, respData));
 
             printText += "Buckets " + destBucket + " and " + pivotBucket +
                     " have been successfully splitted... ";
@@ -977,11 +969,13 @@ public class D2TreeCore {
                     bucketSize + data.getAddedNodes());
             bucketSize = storedMsgData.get(Key.BUCKET_SIZE);
 
-            if (pivotBucket == id) return;
+            // if (pivotBucket == id) return;
 
             Long destBucket = redistCore.getDest();
             boolean isDestBucket = destBucket != null && destBucket == id;
             if (isDestBucket) {
+                rt.set(Role.LAST_BUCKET_NODE, msg.getSourceId());
+                // assert rt.get(Role.LAST_BUCKET_NODE) == msg.getSourceId();
                 mode = Mode.REDISTRIBUTION;
                 printText = String
                         .format("Node %d is dest bucket. "
@@ -993,8 +987,15 @@ public class D2TreeCore {
                 RedistributionResponse rData = new RedistributionResponse(
                         rt.get(Role.LAST_BUCKET_NODE), bucketSize,
                         uncheckedBucketNodes, data.getInitialNode());
-                msg = new Message(id, pivotBucket, rData);
-                send(msg);
+                send(new Message(id, pivotBucket, rData));
+
+                printTree(new Message(id, id, new PrintMessage(msg.getType(),
+                        data.getInitialNode())));
+            }
+            else { // is pivot bucket
+                assert pivotBucket == id;
+                rt.set(Role.FIRST_BUCKET_NODE, msg.getSourceId());
+                // assert rt.get(Role.FIRST_BUCKET_NODE) == msg.getSourceId();
             }
         }
         else throw new UnsupportedOperationException();
@@ -1790,7 +1791,7 @@ public class D2TreeCore {
         String logFile = PrintMessage.logDir + "main" + data.getInitialNode() +
                 "-" + msg.getMsgId() + ".txt";
 
-        System.out.println("Saving log to " + logFile);
+        System.out.println(logFile.substring(logFile.lastIndexOf('/')));
         // TODO Could the removal of a peer (contract) cause problems in the
         // loop? - test this case
 
@@ -1801,13 +1802,17 @@ public class D2TreeCore {
             printText = "Printing Tree (grouped by tree level)";
             print(msg, data.getInitialNode());
 
+            PrintMessage.print(msg,
+                    D2TreeMessageT.toString(data.getSourceType()),
+                    compactLogFile);
             PrintMessage.printPBT(msg, peerRTs, compactLogFile);
-
             PrintMessage.printBuckets(peerRTs, compactLogFile);
 
             printText = "Printing Tree (in sequence, sorted by index)";
             print(msg, data.getInitialNode());
 
+            PrintMessage.print(msg,
+                    D2TreeMessageT.toString(data.getSourceType()), logFile);
             ArrayList<D2TreeCore> myPeers = new ArrayList<D2TreeCore>(peers);
             PrintMessage.printTreeByIndex(myPeers, msg, logFile);
         }
@@ -1920,7 +1925,7 @@ public class D2TreeCore {
             String logFile = PrintMessage.logDir + "state" + initialNode +
                     ".txt";
             String allLogFile = PrintMessage.logDir + "main.txt";
-            System.out.println("Saving log to " + logFile);
+            System.out.println(logFile.substring(logFile.lastIndexOf('/')));
 
             String pText = "\n %s (MID = %d, CNID = %d, INID = %d): %s %s Hops = %d";
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
@@ -1947,7 +1952,7 @@ public class D2TreeCore {
         try {
             String logFile = PrintMessage.logDir + "errors" + initialNode +
                     ".txt";
-            // System.out.println("Saving log to " + logFile);
+            // System.out.println(logFile.substring(logFile.lastIndexOf('/')));
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
             ex.printStackTrace(out);
             out.close();

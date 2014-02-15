@@ -59,7 +59,7 @@ public class PrintMessage extends MessageBody {
             if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
                     !logFile.equals(PrintMessage.logDir + "conn-disconn.txt") &&
                     !logFile.equals(PrintMessage.logDir + "messages.txt")) {
-                System.out.println("Saving log to " + logFile);
+                System.out.println(logFile.substring(logFile.lastIndexOf('/')));
             }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
 
@@ -79,7 +79,7 @@ public class PrintMessage extends MessageBody {
             String logFile, long initialNode) {
         try {
             if (!logFile.equals(PrintMessage.logDir + "errors.txt")) {
-                System.out.println("Saving log to " + logFile);
+                System.out.println(logFile.substring(logFile.lastIndexOf('/')));
             }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
 
@@ -108,7 +108,11 @@ public class PrintMessage extends MessageBody {
             allPeers.add(currentLevelNodes);
             for (Long peerId : currentLevelNodes) {
                 RoutingTable peerRT = myPeers.get(peerId);
-                assert peerRT != null;
+                if (peerRT == null)
+                    throw new IllegalArgumentException("Peer group " +
+                            myPeers.keySet() + " does not contain peer " +
+                            peerId + ".");
+                // assert peerRT != null;
                 if (!peerRT.isLeaf() && !peerRT.isBucketNode()) {
                     nextLevelNodes.add(peerRT.get(Role.LEFT_CHILD));
                     nextLevelNodes.add(peerRT.get(Role.RIGHT_CHILD));
@@ -130,10 +134,12 @@ public class PrintMessage extends MessageBody {
 
             PrintWriter out = null;
             out = new PrintWriter(new FileWriter(logFile, true));
+            out.print("\n\n");
             out.println(peerIds);
             out.close();
 
             out = new PrintWriter(new FileWriter(allLogFile, true));
+            out.print("\n\n");
             out.println(peerIds);
             out.close();
             // for (Long peerId : peerIds) {
@@ -223,7 +229,7 @@ public class PrintMessage extends MessageBody {
         PrintMessage data = (PrintMessage) msg.getData();
         long id = msg.getDestinationId();
         if (id == msg.getSourceId()) {
-            System.out.println("Saving log to " + logFile);
+            System.out.println(logFile.substring(logFile.lastIndexOf('/')));
             // TODO Could the removal of a peer (contract) cause problems in the
             // loop? - test this case
             for (int index = 0; index < peers.size(); index++) {
