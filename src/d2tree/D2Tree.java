@@ -9,14 +9,17 @@ import p2p.simulator.protocol.Peer;
 
 public class D2Tree extends Peer {
 
-    private Network      Net;
-    private D2TreeCore   Core;
+    private Network         Net;
+    private D2TreeCore      Core;
+    private D2TreeIndexCore indexCore;
     // private D2TreeRedistributionCore redistCore;
-    private long         Id;
-    private Thread.State state;
-    private boolean      isOnline;
-    private int          pendingQueries;
-    private int          introducer;
+    private long            Id;
+    private Thread.State    state;
+    private boolean         isOnline;
+    private int             introducer;
+
+    // private long n;
+    // private long k;
 
     @Override
     public void init(long id, long n, long k, Network Net) {
@@ -26,8 +29,8 @@ public class D2Tree extends Peer {
         this.isOnline = false;
         this.state = Thread.State.NEW;
         this.Core = new D2TreeCore(Id, Net);
+        this.indexCore = new D2TreeIndexCore(Id, Net);
         // this.redistCore = new D2TreeRedistributionCore(Id, Net);
-        this.pendingQueries = 0;
         this.introducer = 1;
 
         if (id == 1) isOnline = true;
@@ -106,10 +109,22 @@ public class D2Tree extends Peer {
             Core.disconnect(msg);
             break;
         case D2TreeMessageT.LOOKUP_REQ:
-            Core.forwardLookupRequest(msg);
+            indexCore.lookup(msg, Core.getRT());
             break;
         case D2TreeMessageT.LOOKUP_RES:
-            pendingQueries--;
+            indexCore.decreasePendingQueries();
+            break;
+        case D2TreeMessageT.DELETE_REQ:
+            indexCore.lookup(msg, Core.getRT());
+            break;
+        case D2TreeMessageT.DELETE_RES:
+            indexCore.decreasePendingQueries();
+            break;
+        case D2TreeMessageT.INSERT_REQ:
+            indexCore.lookup(msg, Core.getRT());
+            break;
+        case D2TreeMessageT.INSERT_RES:
+            indexCore.decreasePendingQueries();
             break;
         case D2TreeMessageT.PRINT_MSG:
             Core.printTree(msg);
@@ -164,22 +179,23 @@ public class D2Tree extends Peer {
 
         Message msg;
 
-        pendingQueries++;
+        indexCore.increasePendingQueries();
         msg = new Message(Id, introducer, new LookupRequest(key));
-        Core.forwardLookupRequest(msg);
-        // pendingQueries--;
+        indexCore.lookup(msg, Core.getRT());
+        // if (result == key) pendingQueries--;
+        // else throw new IOException();
     }
 
     @Override
     public void insert(long key) {
-        // throw new UnsupportedOperationException("Not supported yet.");
-        // System.out.println("Not supported yet.");
+        Message msg = new Message(Id, introducer, new InsertRequest(key));
+        indexCore.lookup(msg, Core.getRT());
     }
 
     @Override
     public void delete(long key) {
-        // throw new UnsupportedOperationException("Not supported yet.");
-        // System.out.println("Not supported yet.");
+        Message msg = new Message(Id, introducer, new DeleteRequest(key));
+        indexCore.lookup(msg, Core.getRT());
     }
 
     @Override
@@ -192,7 +208,7 @@ public class D2Tree extends Peer {
 
     @Override
     public int getPendingQueries() {
-        return this.pendingQueries;
+        return indexCore.getPendingQueries();
     }
 
 }

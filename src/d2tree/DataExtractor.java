@@ -29,6 +29,7 @@ public class DataExtractor {
         ArrayList<Long> bucketNodes = new ArrayList<Long>();
         RoutingTable leafRT = myRoutingTables.get(bucketId);
         Long bucketNodeId = leafRT.get(Role.FIRST_BUCKET_NODE);
+        assert bucketNodeId != RoutingTable.DEF_VAL;
         bucketNodes.add(bucketNodeId);
         RoutingTable bucketNodeRT = myRoutingTables.get(bucketNodeId);
         while (!bucketNodeRT.isEmpty(Role.RIGHT_RT)) {

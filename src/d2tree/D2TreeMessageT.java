@@ -23,6 +23,17 @@ public class D2TreeMessageT extends MessageT {
     static final int          PRINT_ERR_MSG          = 1017;
     static final int          REDISTRIBUTE_SETUP_REQ = 1018;
 
+    // index
+    static final int          VWUPDATE_REQ           = 2001;
+    static final int          VWUPDATE_RES           = 2002;
+
+    // static final int LOOKUP_REQ = 1019;
+    // static final int LOOKUP_RES = 1020;
+    // static final int INSERT_REQ = 1021;
+    // static final int INSERT_RES = 1022;
+    // static final int DELETE_REQ = 1023;
+    // static final int DELETE_RES = 1024;
+
     public static String toString(int msgType) {
         switch (msgType) {
         case JOIN_REQ:

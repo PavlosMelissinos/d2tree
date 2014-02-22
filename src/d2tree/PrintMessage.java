@@ -26,12 +26,13 @@ import d2tree.RoutingTable.Role;
 public class PrintMessage extends MessageBody {
 
     // private boolean down;
-    private long         initialNode;
-    private int          msgType;
-    public static String logDir      = "D:/logs/";
+    private long        initialNode;
+    private int         msgType;
+    static final String logDir      = "D:/logs/";
+    static final String logIndexDir = logDir + "index/";
     // public static String logDir = "../logs/";
-    static String        allLogFile  = logDir + "main.txt";
-    static String        treeLogFile = logDir + "tree.txt";
+    static final String allLogFile  = logDir + "main.txt";
+    static final String treeLogFile = logDir + "tree.txt";
 
     // public PrintMessage(boolean down, int msgType, long initialNode) {
     // this.down = down;
@@ -76,9 +77,10 @@ public class PrintMessage extends MessageBody {
     }
 
     static public synchronized void print(Message msg, String printText,
-            String logFile, long initialNode) {
+            String logFile, long initialNode, boolean stdOutFlag) {
         try {
-            if (!logFile.equals(PrintMessage.logDir + "errors.txt")) {
+            if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
+                    stdOutFlag) {
                 System.out.println(logFile.substring(logFile.lastIndexOf('/')));
             }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));
@@ -114,10 +116,13 @@ public class PrintMessage extends MessageBody {
                             peerId + ".");
                 // assert peerRT != null;
                 if (!peerRT.isLeaf() && !peerRT.isBucketNode()) {
-                    nextLevelNodes.add(peerRT.get(Role.LEFT_CHILD));
-                    nextLevelNodes.add(peerRT.get(Role.RIGHT_CHILD));
+                    long leftChild = peerRT.get(Role.LEFT_CHILD);
+                    long rightChild = peerRT.get(Role.RIGHT_CHILD);
+                    if (leftChild != RoutingTable.DEF_VAL)
+                        nextLevelNodes.add(leftChild);
+                    if (rightChild != RoutingTable.DEF_VAL)
+                        nextLevelNodes.add(rightChild);
                 }
-
             }
             currentLevelNodes = new ArrayList<Long>(nextLevelNodes);
             nextLevelNodes.clear();

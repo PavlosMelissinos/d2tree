@@ -1,6 +1,6 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * To change this template, choose Tools | Templates and open the template in
+ * the editor.
  */
 
 package d2tree;
@@ -10,32 +10,37 @@ import p2p.simulator.message.MessageBody;
 import p2p.simulator.message.MessageT;
 
 /**
- * This class creates a special lookup response message body. This special message
- * is used to extract statistics regarding the protocol's lookup algorithm. 
+ * This class creates a special lookup response message body. This special
+ * message is used to extract statistics regarding the protocol's lookup
+ * algorithm.
  * 
  */
 public class LookupResponse extends MessageBody {
-	private static final long serialVersionUID = -7957830319701177797L;
-	int hops;
-    long key;
-    boolean keyExist;
-    
+    private static final long serialVersionUID = -7957830319701177797L;
+    int                       hops;
+    long                      key;
+    boolean                   keyExist;
+
     LookupResponse() {
-        
+
     }
+
     /**
      * Creates the body message of a lookup response message.
-     *  
-     * @param key The key of the lookup request.
-     * @param exist If the key is found is true, otherwise false.
-     * @param msg The initial lookup request message.
+     * 
+     * @param key
+     *            The key of the lookup request.
+     * @param exist
+     *            If the key is found is true, otherwise false.
+     * @param msg
+     *            The initial lookup request message.
      */
     public LookupResponse(long key, boolean exist, Message msg) {
-        this.key = key; 
+        this.key = key;
         this.keyExist = exist;
         this.hops = msg.getHops();
     }
-    
+
     /**
      * Returns the number of peers that the lookup request message visited.
      * 
@@ -44,7 +49,7 @@ public class LookupResponse extends MessageBody {
     public int getHops() {
         return this.hops;
     }
-    
+
     /**
      * Returns the requested key.
      * 
@@ -53,6 +58,7 @@ public class LookupResponse extends MessageBody {
     long getKey() {
         return this.key;
     }
+
     /**
      * Returns true if the key was found, otherwise false.
      * 
@@ -71,13 +77,11 @@ public class LookupResponse extends MessageBody {
     public int getType() {
         return MessageT.LOOKUP_RES;
     }
-    
+
     public String toString() {
         String str;
-        
-        str = "Key: "+key+" exist: "+keyExist+" hops: "+hops;
-        
+        str = "Key: " + key + " exist: " + keyExist + " hops: " + hops;
         return str;
-            
+
     }
 }

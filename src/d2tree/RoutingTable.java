@@ -52,7 +52,7 @@ public class RoutingTable implements Serializable {
             return reverseRole;
         }
 
-        static Role mirrorRole2(Role role) {
+        static Role mirrorRoleAlt(Role role) {
             Role reverseRole = null;
             if (role == PARENT) reverseRole = RIGHT_CHILD;
             else if (role == REPRESENTATIVE) reverseRole = LAST_BUCKET_NODE;
@@ -239,7 +239,7 @@ public class RoutingTable implements Serializable {
         else throw new IllegalArgumentException();
     }
 
-    long getHeight() {
+    long getDepth() {
         return Math.max(leftRT.size(), rightRT.size()) + 1;
     }
 
@@ -260,13 +260,13 @@ public class RoutingTable implements Serializable {
         long peer = get(role, index);
         RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
         Role mirrorRole = Role.mirrorRole(role);
-        Role mirrorRole2 = Role.mirrorRole2(role);
+        Role mirrorRoleAlt = Role.mirrorRoleAlt(role);
         Long mirrorPeer = peerRT.get(mirrorRole, index);
-        Long mirrorPeer2 = peerRT.get(mirrorRole2, index);
+        Long altMirrorPeer = peerRT.get(mirrorRoleAlt, index);
         if (role == Role.REPRESENTATIVE)
             return DataExtractor.getBucketNodes(peer).contains(id) ||
-                    mirrorPeer == id || mirrorPeer2 == id;
-        return mirrorPeer == id || mirrorPeer2 == id;
+                    mirrorPeer == id || altMirrorPeer == id;
+        return mirrorPeer == id || altMirrorPeer == id;
     }
 
     private void updateInconsistencies(Role role, int index, long oldPeer) {
@@ -276,17 +276,28 @@ public class RoutingTable implements Serializable {
             long peer = get(role, index);
             // RoutingTable peerRT = D2TreeCore.routingTables.get(peer);
             Role mirrorRole = Role.mirrorRole(role);
-            Role mirrorRole2 = Role.mirrorRole2(role);
+            Role mirrorRoleAlt = Role.mirrorRoleAlt(role);
 
             if (peer == oldPeer) return;
             updateInconsistencies(id, role, index, oldPeer);
             updateInconsistencies(peer, mirrorRole, index, DEF_VAL);
-            updateInconsistencies(peer, mirrorRole2, index, DEF_VAL);
+            updateInconsistencies(peer, mirrorRoleAlt, index, DEF_VAL);
             updateInconsistencies(oldPeer, mirrorRole, index, DEF_VAL);
-            updateInconsistencies(oldPeer, mirrorRole2, index, DEF_VAL);
+            updateInconsistencies(oldPeer, mirrorRoleAlt, index, DEF_VAL);
             printDiscrepancies();
         }
     }
+
+    // private boolean wasConsistent(long myPeer, Role role, int index,
+    // long oldPeer) {
+    // RoutingTable peerRT = D2TreeCore.routingTables.get(oldPeer);
+    // Role mirrorRole = Role.mirrorRole(role);
+    // Role mirrorRole2 = Role.mirrorRole2(role);
+    // Long mirrorPeer = peerRT.get(mirrorRole, index);
+    // Long mirrorPeer2 = peerRT.get(mirrorRole2, index);
+    // if ()
+    //
+    // }
 
     private void updateInconsistencies(long myPeer, Role role, int index,
             long oldPeer) {
@@ -297,28 +308,32 @@ public class RoutingTable implements Serializable {
         String printText = String.format("%d.%s = %d (replaced %d)", myPeer,
                 role, otherPeer, oldPeer);
         if (disc == null) disc = new HashMap<Role, Long>();
+
         if (isConsistent(role, index)) {
+            printText = "DISCREPANCY_FIXE: " + printText;
+            disc.remove(role);
+        }
+        else if (otherPeer == RoutingTable.DEF_VAL) {
             printText = "DISCREPANCY_FIXE: " + printText;
             disc.remove(role);
         }
         else {
             RoutingTable otherPeerRT = D2TreeCore.routingTables.get(otherPeer);
             if (otherPeerRT == null) {
-                printText = String.format("Other peer is %d (role %s of %d)\n",
-                        otherPeer, role, myPeer);
-                System.err.print(printText);
-                assert otherPeerRT != null;
+                throw new IllegalArgumentException(String.format(
+                        "Other peer is %d (role %s of %d)\n", otherPeer, role,
+                        myPeer));
             }
             Role mirrorRole = Role.mirrorRole(role);
-            Role mirrorRole2 = Role.mirrorRole2(role);
+            Role mirrorRoleAlt = Role.mirrorRoleAlt(role);
             long mirrorPeer = otherPeerRT.get(mirrorRole, index);
-            long mirrorPeer2 = otherPeerRT.get(mirrorRole2, index);
+            long mirrorPeerAlt = otherPeerRT.get(mirrorRoleAlt, index);
             printText = String
                     .format("DISCREPANCY_ADDE: %s whereas %d.%s = %d / %d.%s = %d (new peer) and %d.%s = %d / %d.%s = %d (old peer)",
                             printText, otherPeer, mirrorRole, mirrorPeer,
-                            otherPeer, mirrorRole2, mirrorPeer2, oldPeer,
-                            mirrorRole, mirrorPeer, oldPeer, mirrorRole2,
-                            mirrorPeer2);
+                            otherPeer, mirrorRoleAlt, mirrorPeerAlt, oldPeer,
+                            mirrorRole, mirrorPeer, oldPeer, mirrorRoleAlt,
+                            mirrorPeerAlt);
             disc.put(role, otherPeer);
         }
 
@@ -328,7 +343,8 @@ public class RoutingTable implements Serializable {
         String logFile = PrintMessage.logDir + "errors.txt";
         PrintMessage data = new PrintMessage(D2TreeMessageT.PRINT_ERR_MSG, id);
         Message msg = new Message(id, id, data);
-        PrintMessage.print(msg, printText, logFile, data.getInitialNode());
+        PrintMessage
+                .print(msg, printText, logFile, data.getInitialNode(), true);
     }
 
     private synchronized void printDiscrepancies() {

@@ -496,8 +496,15 @@ public class D2TreeCore {
             RedistributionResponse rData = new RedistributionResponse(
                     rt.get(Role.LAST_BUCKET_NODE), bucketSize,
                     uncheckedBucketNodes, data.getInitialNode());
-            send(new Message(id, msg.getSourceId(), rData));
+            // TODO fix this, it sends a message to itself
             setMode(Mode.TRANSFER, data.getInitialNode());
+            send(new Message(id, msg.getSourceId(), rData));
+            // if (id == msg.getSourceId()) {
+            // forwardBucketRedistributionResponse(msg);
+            // }
+            // else {
+            // send(new Message(id, msg.getSourceId(), rData));
+            // }
         }
         else {// dest != id
               // nodes probably need to be transferred from/to this node
@@ -575,7 +582,7 @@ public class D2TreeCore {
 
         // end redistribution
         long subtreeID = data.getSubtreeID();
-        long totalBuckets = new Double(Math.pow(2, rt.getHeight() - 1))
+        long totalBuckets = new Double(Math.pow(2, rt.getDepth() - 1))
                 .longValue();
         if (diff != 0) optimalBucketSize = optimalBucketSize - 1;
         long totalBucketNodes = optimalBucketSize * totalBuckets;
@@ -583,7 +590,7 @@ public class D2TreeCore {
         printText = "The tree is balanced. Doing an extend/contract test...";
         this.print(msg, data.getInitialNode());
         ExtendContractRequest ecData = new ExtendContractRequest(
-                totalBucketNodes, rt.getHeight(), data.getInitialNode());
+                totalBucketNodes, rt.getDepth(), data.getInitialNode());
         msg = new Message(id, subtreeID, ecData);
         send(msg);
     }
@@ -829,17 +836,6 @@ public class D2TreeCore {
                     Role.RIGHT_RT, 0, transfData.getInitialNode());
             send(new Message(id, rt.get(Role.LEFT_RT, 0), discData));
 
-            // // set left neighbor as the last bucket node of the dest bucket
-            // ConnectMessage connData = new ConnectMessage(
-            // rt.get(Role.LEFT_RT, 0), Role.LAST_BUCKET_NODE, true,
-            // transfData.getInitialNode());
-            // send(new Message(id, destBucket, connData));
-
-            // // set destNode as pivotBucket's first bucket node
-            // connData = new ConnectMessage(destNode, Role.FIRST_BUCKET_NODE,
-            // true, transfData.getInitialNode());
-            // send(new Message(id, pivotBucket, connData));
-
             TransferResponse respData;
             respData = new TransferResponse(-transferSize, pivotBucket,
                     transfData.getInitialNode());
@@ -917,19 +913,6 @@ public class D2TreeCore {
             DisconnectMessage discData = new DisconnectMessage(id,
                     Role.LEFT_RT, 0, transfData.getInitialNode());
             send(new Message(id, rt.get(Role.RIGHT_RT, 0), discData));
-
-            // // set right neighbor as the first bucket node of the bucket
-            // // (pivot)
-            // ConnectMessage connData = new
-            // ConnectMessage(rt.get(Role.RIGHT_RT,
-            // 0), Role.FIRST_BUCKET_NODE, true,
-            // transfData.getInitialNode());
-            // send(new Message(id, pivotBucket, connData));
-
-            // // set pivotNode as destBucket's last bucket node
-            // connData = new ConnectMessage(pivotNode, Role.LAST_BUCKET_NODE,
-            // true, transfData.getInitialNode());
-            // send(new Message(id, destBucket, connData));
 
             TransferResponse respData = new TransferResponse(-transferSize,
                     pivotBucket, transfData.getInitialNode());
@@ -1078,7 +1061,7 @@ public class D2TreeCore {
 
             Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
             // long currentHeight = data.getCurrentHeight();
-            long currentHeight = rt.getHeight();
+            long currentHeight = rt.getDepth();
             printText = "Node " + id + " is a leaf with size = " + bucketSize +
                     ". Optimal height = " + optimalHeight +
                     ", current height = " + currentHeight + ". ";
@@ -1774,12 +1757,6 @@ public class D2TreeCore {
             long nodeToRemove = nodeToAdd;
             rt.unset(role, index, nodeToRemove);
         }
-    }
-
-    void forwardLookupRequest(Message msg) {
-        assert msg.getData() instanceof LookupRequest;
-        // throw new UnsupportedOperationException("Not supported yet.");
-        // System.out.println("Not supported yet.");
     }
 
     void printTree(Message msg) {
