@@ -36,6 +36,7 @@ public class D2TreeIndexCore {
     }
 
     void lookup(Message msg, RoutingTable coreRT) {
+        if (msg != null) return;
         LookupRequest data = (LookupRequest) msg.getData();
         long key = data.getKey();
         long targetNodeId = nextLookupTarget(data, coreRT);

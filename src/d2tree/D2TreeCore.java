@@ -24,12 +24,13 @@ public class D2TreeCore {
     private Mode                       mode;
     private String                     printText;
     private RedistributionCore         redistCore;
+    private long                       vWeight;
 
     private static enum Key {
         LEFT_CHILD_SIZE,
         RIGHT_CHILD_SIZE,
-        UNEVEN_CHILD,
-        BUCKET_SIZE;
+        UNEVEN_CHILD;// ,
+        // BUCKET_SIZE;
         // UNEVEN_SUBTREE_ID,
         // UNCHECKED_BUCKET_NODES,
         // UNCHECKED_BUCKETS,
@@ -88,6 +89,7 @@ public class D2TreeCore {
         if (routingTables == null)
             routingTables = new HashMap<Long, RoutingTable>();
         routingTables.put(id, this.rt);
+        vWeight = 1;
     }
 
     /**
@@ -119,12 +121,12 @@ public class D2TreeCore {
                 this.rt.set(Role.FIRST_BUCKET_NODE, newNodeId);
             }
             else {
-                if (!this.storedMsgData.containsKey(Key.BUCKET_SIZE)) {
-                    msg.setDestinationId(rt.getRandomRTNode());
-                    send(msg);
-                    return;
-                }
-                bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
+                // if (!this.storedMsgData.containsKey(Key.BUCKET_SIZE)) {
+                // msg.setDestinationId(rt.getRandomRTNode());
+                // send(msg);
+                // return;
+                // }
+                bucketSize = vWeight;
                 lastBucketNode = rt.get(Role.LAST_BUCKET_NODE);
 
                 if (lastBucketNode == RoutingTable.DEF_VAL) {
@@ -148,14 +150,15 @@ public class D2TreeCore {
             send(new Message(id, newNodeId, joinData));
 
             assert bucketSize != RoutingTable.DEF_VAL;
-            this.storedMsgData.put(Key.BUCKET_SIZE, bucketSize + 1);
+            // this.storedMsgData.put(Key.BUCKET_SIZE, bucketSize + 1);
+            vWeight++;
             this.rt.set(Role.LAST_BUCKET_NODE, newNodeId);
 
             printText = "Performing balance check...";
             this.print(msg, newNodeId);
 
-            CheckBalanceRequest data = new CheckBalanceRequest(
-                    this.storedMsgData.get(Key.BUCKET_SIZE), newNodeId);
+            CheckBalanceRequest data = new CheckBalanceRequest(vWeight,
+                    newNodeId);
             forwardCheckBalanceRequest(new Message(id, id, data));
         }
         else { // core is an inner node
@@ -216,14 +219,12 @@ public class D2TreeCore {
             printText = "The subtree of " + this.id + " is busy (" + mode +
                     "). Aborting...";
             this.print(msg, data.getInitialNode());
-            if (this.isLeaf())
-                storedMsgData.put(Key.BUCKET_SIZE, data.getTotalBucketSize());
+            if (this.isLeaf()) vWeight = data.getTotalBucketSize();
             return;
         }
         if (this.isBucketNode()) printErr(new Exception(),
                 data.getInitialNode());
-        else if (this.isLeaf()) storedMsgData.put(Key.BUCKET_SIZE,
-                data.getTotalBucketSize());
+        else if (this.isLeaf()) vWeight = data.getTotalBucketSize();
         else if (msg.getSourceId() == rt.get(Role.LEFT_CHILD)) this.storedMsgData
                 .put(Key.LEFT_CHILD_SIZE, data.getTotalBucketSize());
         else if (msg.getSourceId() == rt.get(Role.RIGHT_CHILD)) this.storedMsgData
@@ -250,7 +251,6 @@ public class D2TreeCore {
                 assert rightSubtreeSize != null;
                 this.storedMsgData.put(Key.UNEVEN_CHILD,
                         rt.get(Role.RIGHT_CHILD));
-
                 printText += "Right subtree (" + unevenChild +
                         ") is uneven. Sending size request to its left child...";
                 send(new Message(id, rt.get(Role.LEFT_CHILD), subtreeSizeData));
@@ -331,8 +331,8 @@ public class D2TreeCore {
 
     private void checkLeafBalance(Message msg) {
         CheckBalanceRequest data = (CheckBalanceRequest) msg.getData();
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
-        if (bucketSize == null) {
+        long bucketSize = vWeight;
+        if (bucketSize <= 1) {
             // we haven't accessed this leaf before, we need to compute the
             // node's size
             printText = "Node " + this.id +
@@ -390,7 +390,7 @@ public class D2TreeCore {
 
         redistCore.clear();
         mode = Mode.REDISTRIBUTION_PREPARE;
-        long bucketSize = storedMsgData.get(Key.BUCKET_SIZE);
+        long bucketSize = vWeight;
         long totalBucketNodes = data.getTotalBucketNodes() + bucketSize;
         long totalBuckets = data.getTotalBuckets();
         printText = String
@@ -453,7 +453,7 @@ public class D2TreeCore {
          * transferred from/to it
          */
         long surplus = redistCore.getSurplus();
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE) - surplus;
+        long bucketSize = vWeight - surplus;
         // long uncheckedBucketNodes = redistCore.getUncheckedBucketNodes() +
         // surplus;
         long uncheckedBucketNodes = redistCore.getUncheckedBucketNodes();
@@ -543,10 +543,10 @@ public class D2TreeCore {
          * what is to come, that is compute the size of its bucket and set to
          * "redistribution" mode
          */
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
-        if (bucketSize == null) {
+        long bucketSize = vWeight;
+        if (bucketSize <= 1) {
             printText = "Node " + id +
-                    " is missing bucket info. Computing bucket size...";
+                    " is missing bucket info. Recomputing bucket size...";
             this.print(msg, data.getInitialNode());
             msg = new Message(id, rt.get(Role.FIRST_BUCKET_NODE),
                     new GetSubtreeSizeRequest(Mode.REDISTRIBUTION,
@@ -602,7 +602,7 @@ public class D2TreeCore {
 
         // get all necessary info
         long surplus = redistCore.getSurplus();
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE) - surplus;
+        long bucketSize = vWeight - surplus;
         Long uncheckedBucketNodes = data.getTotalUncheckedBucketNodes();
         Long uncheckedBuckets = data.getTotalUncheckedBuckets();
         long subtreeID = redistCore.getUnevenSubtreeID();
@@ -632,7 +632,7 @@ public class D2TreeCore {
          */
         RedistributionRequest data = (RedistributionRequest) msg.getData();
         long surplus = redistCore.getSurplus();
-        Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE) - surplus;
+        long bucketSize = vWeight - surplus;
         long destIndex = data.getDestIndex();
 
         // reset bucket status except surplus counter
@@ -693,7 +693,7 @@ public class D2TreeCore {
         long optimalBucketSize = uncheckedBucketNodes / uncheckedBuckets;
         long spareNodes = uncheckedBucketNodes % uncheckedBuckets;
         long surplus = redistCore.getSurplus();
-        long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE) - surplus;
+        long bucketSize = vWeight - surplus;
         int diff = (int) (bucketSize - optimalBucketSize);
         long destSize = data.getDestSize() - surplus;
         int destDiff = (int) (destSize - optimalBucketSize);
@@ -812,7 +812,8 @@ public class D2TreeCore {
         // if this is the first time we visit dest, connect its last node to
         // the first node of pivot
         if (hopsIndex == 1) {
-            assert rt.isEmpty(Role.RIGHT_RT);
+            assert rt.isEmpty(Role.RIGHT_RT) ||
+                    rt.get(Role.RIGHT_RT, 0) == pivotNode;
             assert pivotNode != RoutingTable.DEF_VAL;
 
             // set dest node as pivot node's left neighbor
@@ -947,15 +948,11 @@ public class D2TreeCore {
         TransferResponse data = (TransferResponse) msg.getData();
         if (this.isLeaf()) {
             long pivotBucket = data.getPivotBucket();
-            long bucketSize = storedMsgData.get(Key.BUCKET_SIZE);
-            storedMsgData.put(Key.BUCKET_SIZE,
-                    bucketSize + data.getAddedNodes());
-            bucketSize = storedMsgData.get(Key.BUCKET_SIZE);
-
-            // if (pivotBucket == id) return;
+            vWeight += data.getAddedNodes();
+            long bucketSize = vWeight;
 
             Long destBucket = redistCore.getDest();
-            boolean isDestBucket = destBucket != null && destBucket == id;
+            boolean isDestBucket = destBucket == id;
             if (isDestBucket) {
                 rt.set(Role.LAST_BUCKET_NODE, msg.getSourceId());
                 // assert rt.get(Role.LAST_BUCKET_NODE) == msg.getSourceId();
@@ -975,10 +972,15 @@ public class D2TreeCore {
                 printTree(new Message(id, id, new PrintMessage(msg.getType(),
                         data.getInitialNode())));
             }
-            else { // is pivot bucket
-                assert pivotBucket == id;
+            else if (pivotBucket == id) { // is pivot bucket
                 rt.set(Role.FIRST_BUCKET_NODE, msg.getSourceId());
                 // assert rt.get(Role.FIRST_BUCKET_NODE) == msg.getSourceId();
+            }
+            else {
+                assert destBucket == null;
+                if (destBucket == null) {
+
+                }
             }
         }
         else throw new UnsupportedOperationException();
@@ -1059,7 +1061,7 @@ public class D2TreeCore {
             // forward request to the bucket node
             long optimalHeight = data.getOptimalHeight();
 
-            Long bucketSize = this.storedMsgData.get(Key.BUCKET_SIZE);
+            long bucketSize = vWeight;
             // long currentHeight = data.getCurrentHeight();
             long currentHeight = rt.getDepth();
             printText = "Node " + id + " is a leaf with size = " + bucketSize +
@@ -1225,7 +1227,7 @@ public class D2TreeCore {
 
         // trick, accounts for odd vs even optimal sizes
         long optimalBucketSize = (data.getOldOptimalBucketSize() - 1) / 2;
-        this.storedMsgData.put(Key.BUCKET_SIZE, optimalBucketSize);
+        vWeight = optimalBucketSize;
 
         printText = "Bucket node " + id +
                 " successfully turned into a left leaf...";
@@ -1298,7 +1300,8 @@ public class D2TreeCore {
         assert msg.getData() instanceof ExtendResponse;
         ExtendResponse data = (ExtendResponse) msg.getData();
         if (data.getBucketSize() != ExtendResponse.DEF_VAL) {
-            finalizeExtension(data.getBucketSize());
+            assert this.isLeaf() || rt.childrenAreLeaves();
+            if (this.isLeaf()) vWeight = data.getBucketSize();
             return;
         }
 
@@ -1312,7 +1315,6 @@ public class D2TreeCore {
         long lChild0 = data.getLeftChild();
         long rChild0 = data.getRightChild();
         if (index == 0) {
-            storedMsgData.remove(Key.BUCKET_SIZE);
             // add a link from left adjacent to left child
             if (rt.contains(Role.LEFT_A_NODE) &&
                     rt.get(Role.LEFT_A_NODE) != lChild0) {
@@ -1513,15 +1515,6 @@ public class D2TreeCore {
         }
     }
 
-    void finalizeExtension(long bucketSize) {
-        boolean childrenAreLeaves = rt.get(Role.LEFT_A_NODE) == rt
-                .get(Role.LEFT_CHILD) ||
-                rt.get(Role.RIGHT_A_NODE) == rt.get(Role.RIGHT_CHILD);
-        assert this.isLeaf() || childrenAreLeaves;
-        if (this.isLeaf()) storedMsgData.put(Key.BUCKET_SIZE, bucketSize);
-        if (childrenAreLeaves) storedMsgData.remove(Key.BUCKET_SIZE);
-    }
-
     void forwardContractRequest(Message msg) {
         assert msg.getData() instanceof ContractRequest;
         // TODO contract
@@ -1557,11 +1550,11 @@ public class D2TreeCore {
             }
         }
         else if (this.isLeaf()) {
-            Long bucketSize = storedMsgData.get(Key.BUCKET_SIZE);
+            long bucketSize = vWeight;
             // ArrayList<Long> nodes = DataExtractor.getBucketNodes(peers,
             // this);
             // assert bucketSize.intValue() == nodes.size();
-            if (bucketSize == null) {
+            if (bucketSize <= 1) {
                 printText = "This is a leaf. Forwarding to first bucket node with id " +
                         rt.get(Role.FIRST_BUCKET_NODE) + ".";
                 this.print(msg, msgData.getInitialNode());
@@ -1664,7 +1657,7 @@ public class D2TreeCore {
                     ") MsgMode: " + msgMode;
             this.print(msg, data.getInitialNode());
         }
-        else this.storedMsgData.put(Key.BUCKET_SIZE, givenSize);
+        else vWeight = givenSize;
         // decide if a message needs to be sent
         // if (mode == Mode.MODE_CHECK_BALANCE && (this.id == destinationID ||
         // this.isLeaf())){

@@ -191,13 +191,21 @@ public class PrintMessage extends MessageBody {
         PrintWriter out1 = new PrintWriter(new FileWriter(allLogFile, true));
         PrintWriter out2 = new PrintWriter(new FileWriter(treeLogFile, true));
 
+        int counter = 0;
         for (Long leaf : leaves) {
+            int properBucketSize = properBucketIds.get(leaf).size();
             String properText = String
-                    .format("\nPrinting Bucket of %d (navigation via bucket nodes' routing tables, starting from %d)\n%s",
-                            leaf, leaf, properBucketIds.get(leaf));
+                    .format("\nPrinting Bucket of %d (navigation via bucket nodes' routing tables, starting from %d), size = %d \n%s",
+                            leaf, leaf, properBucketSize,
+                            properBucketIds.get(leaf));
+            int bucketSize = bucketIds.get(leaf).size();
             String text = String
-                    .format("\nPrinting Bucket of %d (show all nodes with %d as a representatives)\n%s",
-                            leaf, leaf, bucketIds.get(leaf));
+                    .format("\nPrinting Bucket of %d (show all nodes with %d as a representatives), size = %d \n%s",
+                            leaf, leaf, bucketSize, bucketIds.get(leaf));
+            if (counter % 2 == 1) {
+                properText += "\n";
+                text += "\n";
+            }
             out.format(text);
             out.format(properText);
 
@@ -206,6 +214,7 @@ public class PrintMessage extends MessageBody {
 
             out2.format(text);
             out2.format(properText);
+            counter++;
         }
         out.close();
         out1.close();

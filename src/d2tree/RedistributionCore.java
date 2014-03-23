@@ -64,8 +64,9 @@ public class RedistributionCore implements Serializable {
     }
 
     public void set(RedistributionRequest data) {
-        this.uncheckedBucketNodes = data.getTotalUncheckedBucketNodes() +
-                this.getSurplus();
+        // this.uncheckedBucketNodes = data.getTotalUncheckedBucketNodes() +
+        // this.getSurplus();
+        this.uncheckedBucketNodes = data.getTotalUncheckedBucketNodes();
         this.uncheckedBuckets = data.getTotalUncheckedBuckets();
         this.unevenSubtreeID = data.getSubtreeID();
     }

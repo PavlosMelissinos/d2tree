@@ -243,6 +243,11 @@ public class RoutingTable implements Serializable {
         return Math.max(leftRT.size(), rightRT.size()) + 1;
     }
 
+    boolean childrenAreLeaves() {
+        return get(Role.LEFT_A_NODE) == get(Role.LEFT_CHILD) ||
+                get(Role.RIGHT_A_NODE) == get(Role.RIGHT_CHILD);
+    }
+
     long getRandomRTNode() {
         int max = size(Role.LEFT_RT) + size(Role.RIGHT_RT);
         double rand = Math.floor(Math.random() * max);
