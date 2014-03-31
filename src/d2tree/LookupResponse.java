@@ -21,10 +21,6 @@ public class LookupResponse extends MessageBody {
     long                      key;
     boolean                   keyExist;
 
-    LookupResponse() {
-
-    }
-
     /**
      * Creates the body message of a lookup response message.
      * 
