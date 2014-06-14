@@ -19,7 +19,7 @@ public class D2TreeCore {
 
     private RoutingTable               rt;
     private Network                    net;
-    protected final long               id;
+    private long                       id;
     private HashMap<Key, Long>         storedMsgData;
     private Mode                       mode;
     private String                     printText;
@@ -90,6 +90,17 @@ public class D2TreeCore {
             routingTables = new HashMap<Long, RoutingTable>();
         routingTables.put(id, this.rt);
         vWeight = 1;
+    }
+
+    D2TreeCore(D2TreeCore anotherCore) {
+        this.id = anotherCore.id;
+        this.mode = anotherCore.mode;
+        this.net = anotherCore.net;
+        this.printText = anotherCore.printText;
+        this.redistCore = anotherCore.redistCore;
+        this.rt = anotherCore.rt;
+        this.storedMsgData = anotherCore.storedMsgData;
+        this.vWeight = anotherCore.vWeight;
     }
 
     /**
@@ -1854,6 +1865,87 @@ public class D2TreeCore {
         return treeHeight;
     }
 
+    public void fixBrokenLinks(long newID, long correctNode) {
+        if (!this.isLeaf() && !this.isBucketNode()) {// inner node
+            // is inner node, check adjacent nodes and children
+            this.id = newID;
+
+            // fix outgoing links
+            if (rt.get(Role.RIGHT_A_NODE) == id) {
+                rt.set(Role.RIGHT_A_NODE, correctNode);
+                if (rt.get(Role.RIGHT_CHILD) == id)
+                    rt.set(Role.RIGHT_CHILD, correctNode);
+            }
+            else if (rt.get(Role.LEFT_A_NODE) == id) {
+                // shouldn't happen for inner nodes, therefore throw
+                // exception
+                rt.set(Role.LEFT_A_NODE, correctNode);
+                if (rt.get(Role.LEFT_CHILD) == id)
+                    rt.set(Role.LEFT_CHILD, correctNode);
+                try {
+                    throw new Exception();
+                }
+                catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+
+            // fix incoming links
+            ConnectMessage data = null;
+
+            // fix left routing table
+            for (int i = 0; i < rt.size(Role.LEFT_RT); i++) {
+                data = new ConnectMessage(id, Role.RIGHT_RT, i, true,
+                        RoutingTable.DEF_VAL);
+                send(new Message(id, rt.get(Role.LEFT_RT, i), data));
+            }
+            // fix right routing table
+            for (int i = 0; i < rt.size(Role.RIGHT_RT); i++) {
+                data = new ConnectMessage(id, Role.LEFT_RT, i, true,
+                        RoutingTable.DEF_VAL);
+                send(new Message(id, rt.get(Role.RIGHT_RT, i), data));
+            }
+            // fix children
+            data = new ConnectMessage(id, Role.PARENT, true,
+                    RoutingTable.DEF_VAL);
+            send(new Message(id, rt.get(Role.LEFT_CHILD), data));
+            send(new Message(id, rt.get(Role.RIGHT_CHILD), data));
+            // fix adjacent nodes
+            data = new ConnectMessage(id, Role.LEFT_A_NODE, true,
+                    RoutingTable.DEF_VAL);
+            send(new Message(id, rt.get(Role.RIGHT_A_NODE), data));
+
+            data = new ConnectMessage(id, Role.RIGHT_A_NODE, true,
+                    RoutingTable.DEF_VAL);
+            send(new Message(id, rt.get(Role.LEFT_A_NODE), data));
+
+            // fix parent
+            // FIXME parents won't know which child is the correct one
+            data = new ConnectMessage(id, null, true, RoutingTable.DEF_VAL);
+            send(new Message(id, rt.get(Role.PARENT), data));
+        }
+        else if (this.isLeaf()) { // ex-bucket node
+            // fix outgoing links
+            rt.set(Role.FIRST_BUCKET_NODE, correctNode);
+
+            // fix incoming links
+            // FIXME we need to traverse the whole bucket to change their
+            // representative's value
+
+            // get prepared for balance check
+            if (mode == Mode.REDISTRIBUTION_PREPARE)
+                redistCore.decreaseSurplus();
+            vWeight--;
+            CheckBalanceRequest cbData = new CheckBalanceRequest(vWeight,
+                    RoutingTable.DEF_VAL);
+            forwardCheckBalanceRequest(new Message(id, id, cbData));
+        }
+        else if (this.isBucketNode()) {
+            // FIXME traverse whole bucket
+        }
+    }
+
     private boolean should(ECMode ecMode, long treeHeight,
             double averageBucketSize) {
         double factor = 2.0;
@@ -1882,6 +1974,10 @@ public class D2TreeCore {
 
     RoutingTable getRT() {
         return this.rt;
+    }
+
+    long getID() {
+        return this.id;
     }
 
     private void print(Message msg, long initialNode) {

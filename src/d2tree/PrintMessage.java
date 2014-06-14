@@ -252,12 +252,14 @@ public class PrintMessage extends MessageBody {
                 PrintWriter out = null;
                 try {
                     out = new PrintWriter(new FileWriter(logFile, true));
-                    out.format("\nMID=%3d, Id=%3d,", msg.getMsgId(), peer.id);
+                    out.format("\nMID=%3d, Id=%3d,", msg.getMsgId(),
+                            peer.getID());
                     peerRT.print(out);
                     out.close();
 
                     out = new PrintWriter(new FileWriter(allLogFile, true));
-                    out.format("\nMID=%3d, Id=%3d,", msg.getMsgId(), peer.id);
+                    out.format("\nMID=%3d, Id=%3d,", msg.getMsgId(),
+                            peer.getID());
                     peerRT.print(out);
                     out.close();
                 }
@@ -277,10 +279,10 @@ public class PrintMessage extends MessageBody {
                 String msgType = peer.isRoot() ? D2TreeMessageT.toString(data
                         .getSourceType()) + "\n" : "";
                 out2.format("\n%s MID=%5d, Id=%3d,", msgType, msg.getMsgId(),
-                        peer.id);
+                        peer.getID());
                 peer.getRT().print(out2);
                 if (data.getSourceType() == D2TreeMessageT.PRINT_ERR_MSG &&
-                        peer.id == id) {
+                        peer.getID() == id) {
                     out2.format(" <-- DISCREPANCY DETECTED");
                 }
             }

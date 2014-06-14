@@ -78,6 +78,10 @@ public class RoutingTable implements Serializable {
         discrepancies.put(id, new HashMap<Role, Long>());
     }
 
+    void setID(long newID) {
+        this.id = newID;
+    }
+
     void set(Role role, int index, long value) {
         long oldValue = this.get(role, index);
         if (value == DEF_VAL) {
@@ -394,6 +398,12 @@ public class RoutingTable implements Serializable {
         // the root has no parent and no representative
         return !contains(Role.PARENT) && !contains(Role.REPRESENTATIVE);
     }
+
+    // RoutingTable migrate(long newID, Role roleToReplace) {
+    // RoutingTable result = this;
+    // result.id = newID;
+    //
+    // }
 
     public String toString() {
         String lRT = "";

@@ -17,3 +17,5 @@ reports/D2Tree-sim-1
 src/batonstar/
 _deleteLogs.bat
 answers.txt
+UML/
+*.uml

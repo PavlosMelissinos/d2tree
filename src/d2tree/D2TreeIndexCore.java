@@ -3,9 +3,6 @@ package d2tree;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import p2p.simulator.message.DeleteResponse;
-import p2p.simulator.message.InsertResponse;
-import p2p.simulator.message.LookupResponse;
 import p2p.simulator.message.Message;
 import p2p.simulator.message.MessageT;
 import p2p.simulator.network.Network;
@@ -15,8 +12,8 @@ import d2tree.RoutingTable.Role;
 
 public class D2TreeIndexCore {
     Network             net;
-    private final long  id;
-    ArrayList<Long>     keys;
+    private long        id;
+    ArrayList<Double>   keys;
     private int         pendingQueries;
     static final String logIndexFile = PrintMessage.logIndexDir + "lookup.txt";
     double              lVWeight;
@@ -27,7 +24,7 @@ public class D2TreeIndexCore {
     D2TreeIndexCore(long id, Network network) {
         this.net = network;
         this.id = id;
-        keys = new ArrayList<Long>();
+        keys = new ArrayList<Double>();
         this.pendingQueries = 0;
         this.lVWeight = 0;
         this.rVWeight = 0;
@@ -35,10 +32,27 @@ public class D2TreeIndexCore {
         this.vWeight = 0;
     }
 
+    D2TreeIndexCore(D2TreeIndexCore anotherIndexCore) {
+        this.id = anotherIndexCore.id;
+        this.net = anotherIndexCore.net;
+        this.bVWeight = anotherIndexCore.bVWeight;
+        this.keys = anotherIndexCore.keys;
+        this.pendingQueries = anotherIndexCore.pendingQueries;
+        this.lVWeight = anotherIndexCore.lVWeight;
+        this.rVWeight = anotherIndexCore.rVWeight;
+        this.bVWeight = anotherIndexCore.bVWeight;
+        this.vWeight = anotherIndexCore.vWeight;
+    }
+
+    void setID(long id) {
+        this.id = id;
+    }
+
     void lookup(Message msg, RoutingTable coreRT) {
-        if (msg != null) return;
+        if (msg != null) return; // comment to force code not to work,
+                                 // uncomment to work it
         LookupRequest data = (LookupRequest) msg.getData();
-        long key = data.getKey();
+        double key = data.getKey();
         long targetNodeId = nextLookupTarget(data, coreRT);
         if (id == targetNodeId) {
             this.decreasePendingQueries();
@@ -99,9 +113,13 @@ public class D2TreeIndexCore {
         }
     }
 
-    boolean directionHasChanged(long key, KeyPosition pos) {
-        long minRange = Collections.min(keys);
-        long maxRange = Collections.max(keys);
+    void addValue(double value) {
+        this.keys.add(value);
+    }
+
+    boolean directionHasChanged(double key, KeyPosition pos) {
+        double minRange = Collections.min(keys);
+        double maxRange = Collections.max(keys);
         KeyPosition newPos = KeyPosition.getPosition(key, minRange, maxRange);
         return newPos != pos;
     }
@@ -112,8 +130,8 @@ public class D2TreeIndexCore {
         KeyPosition pos = data.getKeyPosition();
         LookupPhase phase = data.getLookupPhase();
         if (keys.isEmpty()) return id;
-        long minRange = Collections.min(keys);
-        long maxRange = Collections.max(keys);
+        double minRange = Collections.min(keys);
+        double maxRange = Collections.max(keys);
 
         ArrayList<Long> possibleTargets = new ArrayList<Long>();
         if (key < minRange) {
@@ -232,8 +250,8 @@ public class D2TreeIndexCore {
 
     long nextLookupTargetOnlyLeaves(long key, RoutingTable rt, int distance) {
 
-        long minRange = Collections.min(keys);
-        long maxRange = Collections.max(keys);
+        double minRange = Collections.min(keys);
+        double maxRange = Collections.max(keys);
 
         ArrayList<Long> possibleTargets = new ArrayList<Long>();
         int rtLimit = log(distance, 2);

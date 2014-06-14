@@ -18,7 +18,7 @@ import p2p.simulator.message.MessageT;
 public class LookupResponse extends MessageBody {
     private static final long serialVersionUID = -7957830319701177797L;
     int                       hops;
-    long                      key;
+    double                    key;
     boolean                   keyExist;
 
     /**
@@ -31,7 +31,7 @@ public class LookupResponse extends MessageBody {
      * @param msg
      *            The initial lookup request message.
      */
-    public LookupResponse(long key, boolean exist, Message msg) {
+    public LookupResponse(double key, boolean exist, Message msg) {
         this.key = key;
         this.keyExist = exist;
         this.hops = msg.getHops();
@@ -51,7 +51,7 @@ public class LookupResponse extends MessageBody {
      * 
      * @return The key.
      */
-    long getKey() {
+    double getKey() {
         return this.key;
     }
 

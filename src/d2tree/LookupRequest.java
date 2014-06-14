@@ -17,7 +17,8 @@ public class LookupRequest extends MessageBody {
         LESS,
         GREATER,
         NEITHER;
-        static KeyPosition getPosition(long key, long minRange, long maxRange) {
+        static KeyPosition getPosition(double key, double minRange,
+                double maxRange) {
             if (key < minRange) return LESS;
             else if (key > maxRange) return GREATER;
             else return NEITHER;

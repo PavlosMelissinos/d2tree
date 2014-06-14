@@ -49,7 +49,7 @@ public class DataExtractor {
         ArrayList<Long> bucketNodes = new ArrayList<Long>();
         for (D2TreeCore peer : peers) {
             long representative = peer.getRT().get(Role.REPRESENTATIVE);
-            if (representative == leaf.id) bucketNodes.add(peer.id);
+            if (representative == leaf.getID()) bucketNodes.add(peer.getID());
         }
         return bucketNodes;
     }
