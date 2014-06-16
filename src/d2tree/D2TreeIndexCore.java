@@ -7,6 +7,7 @@ import p2p.simulator.message.Message;
 import p2p.simulator.message.MessageT;
 import p2p.simulator.network.Network;
 import d2tree.LookupRequest.KeyPosition;
+import d2tree.LookupRequest.LookupMode;
 import d2tree.LookupRequest.LookupPhase;
 import d2tree.RoutingTable.Role;
 
@@ -49,68 +50,165 @@ public class D2TreeIndexCore {
     }
 
     void lookup(Message msg, RoutingTable coreRT) {
-        if (msg != null) return; // comment to force code not to work,
-                                 // uncomment to work it
+        // // uncomment to force code not to work, comment to work it
+        // if (msg != null) return;
+
         LookupRequest data = (LookupRequest) msg.getData();
         double key = data.getKey();
-        long targetNodeId = nextLookupTarget(data, coreRT);
-        if (id == targetNodeId) {
-            this.decreasePendingQueries();
-            boolean keyExists = keys.contains(key);
-            if (msg.getType() == MessageT.INSERT_REQ) {
-                if (!keyExists) keys.add(key);
-                InsertResponse rData = new InsertResponse(key, !keyExists, msg);
-                net.sendMsg(new Message(id, msg.getSourceId(), rData));
+
+        // //uncomment when ready
+        // data.updateBounds(Collections.min(keys), Collections.max(keys));
+
+        long targetNodeId = RoutingTable.DEF_VAL;
+        // long targetNodeId = nextLookupTarget(data, coreRT);
+        if (keyIsInRange(key)) {
+            resolveSubrequest(msg);
+        }
+        else if (data.getLookupMode() == LookupMode.VIA_LEAVES) {
+            KeyPosition pos = KeyPosition.getPosition(key,
+                    Collections.min(keys), Collections.max(keys));
+            if (!coreRT.isLeaf() && !coreRT.isBucketNode()) {
+                if (pos == KeyPosition.GREATER) targetNodeId = coreRT
+                        .get(Role.RIGHT_A_NODE);
+                else targetNodeId = coreRT.get(Role.LEFT_A_NODE);
+
+                msg.setDestinationId(targetNodeId);
+                data.setKeyPosition(pos);
+                msg.setData(data);
+                net.sendMsg(msg);
             }
-            else if (msg.getType() == MessageT.DELETE_REQ) {
-                if (keyExists) keys.remove(key);
-                DeleteResponse rData = new DeleteResponse(key, keyExists, msg);
-                net.sendMsg(new Message(id, msg.getSourceId(), rData));
+            else if (coreRT.isLeaf()) {
+                int keyDistance = data.getKeyRTDistance();
+                Role role = null;
+                assert pos == KeyPosition.GREATER || pos == KeyPosition.LESS;
+                if (pos == KeyPosition.GREATER) role = Role.RIGHT_RT;
+                else role = Role.LEFT_RT;
+
+                if (keyDistance < 0) {
+                    keyDistance = coreRT.size(role);
+                    targetNodeId = coreRT.get(role, keyDistance - 1);
+                }
+                else if (keyDistance > 1) {
+                    keyDistance--;
+                    targetNodeId = coreRT.get(role, keyDistance - 1);
+                }
+                else {
+                    assert keyDistance == 1;
+                    if (pos == KeyPosition.GREATER) {
+                        targetNodeId = coreRT.get(Role.LAST_BUCKET_NODE);
+                        data.addToQueue(coreRT.get(Role.RIGHT_A_NODE));
+                        data.addToQueue(coreRT.get(Role.RIGHT_RT, 0));
+                    }
+                    else {
+                        assert pos == KeyPosition.LESS;
+                        targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+                    }
+                }
+
+                msg.setDestinationId(targetNodeId);
+                data.setKeyPosition(pos);
+                data.setKeyRTDistance(keyDistance);
+                msg.setData(data);
+                net.sendMsg(msg);
             }
             else {
-                assert msg.getType() == MessageT.LOOKUP_REQ;
-                LookupResponse rData = new LookupResponse(key, keyExists, msg);
-                net.sendMsg(new Message(id, msg.getSourceId(), rData));
+                assert coreRT.isBucketNode();
+                if (pos == KeyPosition.LESS) {
+                    if (coreRT.isEmpty(Role.LEFT_RT)) {
+                        msg.setDestinationId(targetNodeId);
+                        resolveSubrequest(msg, targetNodeId);
+                        return;
+                    }
+                    else {
+                        targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+                    }
+                }
+                else if (pos == KeyPosition.GREATER) {
+                    if (coreRT.isEmpty(Role.RIGHT_RT)) {
+                        targetNodeId = data.getNextInQueue();
+
+                        msg.setDestinationId(targetNodeId);
+                        data.setKeyPosition(pos);
+                        msg.setData(data);
+                        net.sendMsg(msg);
+                    }
+                    else {
+                        resolveSubrequest(msg);
+                    }
+                }
             }
-            String printText = String
-                    .format("Request of type %s for key %d has reached target %d after %d hops",
-                            MessageT.toString(msg.getType()), key,
-                            targetNodeId, msg.getHops());
-            PrintMessage.print(msg, printText, logIndexFile);
         }
         else {
-            LookupPhase phase = data.getLookupPhase();
-            KeyPosition pos = data.getKeyPosition();
-            switch (phase) {
-            case ZERO:
-                data.setLookupPhase(phase.increment());
-                break;
-            case RT:
-                // TODO this will change when full routing tables are employed
-                if (directionHasChanged(key, pos))
-                    data.setLookupPhase(phase.increment()); // set to vertical
-                break;
-            case VERTICAL:
-                // TODO this will change when full routing tables are employed
-                if (directionHasChanged(key, pos)) {
-                    data.setLookupPhase(phase.increment()); // set to adjacent
-                }
-                break;
-            case ADJACENT: // do nothing
-                break;
-            default: // do nothing
-                break;
-            }
-            if (directionHasChanged(key, pos)) pos.invert();
-            data.setKeyPosition(pos);
-            msg.setData(data);
-            msg.setDestinationId(targetNodeId);
-            net.sendMsg(msg);
-            String printText = String.format(
-                    "Forwarding lookup request for key %d to %d", key,
-                    targetNodeId);
-            PrintMessage.print(msg, printText, logIndexFile);
+            slowLookup(msg, key, targetNodeId);
         }
+    }
+
+    void slowLookup(Message msg, double key, long targetNodeId) {
+
+        LookupRequest data = (LookupRequest) msg.getData();
+        LookupPhase phase = data.getLookupPhase();
+        KeyPosition pos = data.getKeyPosition();
+        switch (phase) {
+        case ZERO:
+            data.setLookupPhase(phase.increment());
+            break;
+        case RT:
+            // TODO this will change when full routing tables are employed
+            if (directionHasChanged(key, pos))
+                data.setLookupPhase(phase.increment()); // set to vertical
+            break;
+        case VERTICAL:
+            // TODO this will change when full routing tables are employed
+            if (directionHasChanged(key, pos)) {
+                data.setLookupPhase(phase.increment()); // set to adjacent
+            }
+            break;
+        case ADJACENT: // do nothing
+            break;
+        default: // do nothing
+            break;
+        }
+        if (directionHasChanged(key, pos)) pos.invert();
+        data.setKeyPosition(pos);
+        msg.setData(data);
+        msg.setDestinationId(targetNodeId);
+        net.sendMsg(msg);
+        String printText = String
+                .format("Forwarding lookup request for key %d to %d", key,
+                        targetNodeId);
+        PrintMessage.print(msg, printText, logIndexFile);
+    }
+
+    private void resolveSubrequest(Message msg) {
+        resolveSubrequest(msg, msg.getSourceId());
+    }
+
+    private void resolveSubrequest(Message msg, long dest) {
+        LookupRequest data = (LookupRequest) msg.getData();
+        double key = data.getKey();
+        this.decreasePendingQueries();
+        boolean keyExists = keys.contains(key);
+        if (msg.getType() == MessageT.INSERT_REQ) {
+            if (!keyExists) keys.add(key);
+            InsertResponse rData = new InsertResponse(key, keyExists, msg);
+            net.sendMsg(new Message(id, dest, rData));
+        }
+        else if (msg.getType() == MessageT.DELETE_REQ) {
+            if (keyExists) keys.remove(key);
+            DeleteResponse rData = new DeleteResponse(key, keyExists, msg);
+            net.sendMsg(new Message(id, dest, rData));
+        }
+        else {
+            assert msg.getType() == MessageT.LOOKUP_REQ;
+            LookupResponse rData = new LookupResponse(key, keyExists, msg);
+            net.sendMsg(new Message(id, dest, rData));
+        }
+        String printText = String
+                .format("Request of type %s for key %d has reached target %d after %d hops",
+                        MessageT.toString(msg.getType()), key, id,
+                        msg.getHops());
+        PrintMessage.print(msg, printText, logIndexFile);
+
     }
 
     void addValue(double value) {
@@ -126,7 +224,7 @@ public class D2TreeIndexCore {
 
     // initially KeyPosition is NEITHER, lookup phase is FIRST
     long nextLookupTarget(LookupRequest data, RoutingTable coreRT) {
-        long key = data.getKey();
+        double key = data.getKey();
         KeyPosition pos = data.getKeyPosition();
         LookupPhase phase = data.getLookupPhase();
         if (keys.isEmpty()) return id;
@@ -248,28 +346,60 @@ public class D2TreeIndexCore {
         }
     }
 
-    long nextLookupTargetOnlyLeaves(long key, RoutingTable rt, int distance) {
-
+    long nextLookupTargetOnlyLeaves(double key, RoutingTable rt, int rtDistance) {
         double minRange = Collections.min(keys);
         double maxRange = Collections.max(keys);
-
-        ArrayList<Long> possibleTargets = new ArrayList<Long>();
-        int rtLimit = log(distance, 2);
+        Role role;
         if (key < minRange) {
-            for (int i = rtLimit; i >= 0; i--) {
-                possibleTargets.add(rt.get(Role.LEFT_RT, i));
-            }
-            possibleTargets.add(rt.get(Role.LEFT_A_NODE));
+            role = Role.LEFT_RT;
         }
         else if (key > maxRange) {
-            for (int i = rtLimit; i >= 0; i--)
-                possibleTargets.add(rt.get(Role.RIGHT_RT, i));
-            possibleTargets.add(rt.get(Role.RIGHT_A_NODE));
+            role = Role.RIGHT_RT;
         }
-        Double difference = Math.pow(2, rtLimit);
-        distance -= difference.intValue();
-        // TODO continue implementation
-        return 0;
+        else return id;
+
+        if (rtDistance < 0) {
+            rtDistance = rt.size(role);
+        }
+        else if (rtDistance < 0) {
+            rtDistance--;
+        }
+
+        long nextLookupTargetID = rt.get(role, rtDistance);
+        return nextLookupTargetID;
+    }
+
+    private boolean keyIsInRange(double key) {
+        double minRange = Collections.min(keys);
+        double maxRange = Collections.max(keys);
+        if (key < minRange) {
+            return false;
+        }
+        else if (key > maxRange) {
+            return false;
+        }
+        return true;
+    }
+
+    int determineNewKeyDistance(double key, RoutingTable rt, int rtDistance) {
+        double minRange = Collections.min(keys);
+        double maxRange = Collections.max(keys);
+        Role role;
+        if (key < minRange) {
+            role = Role.LEFT_RT;
+        }
+        else if (key > maxRange) {
+            role = Role.RIGHT_RT;
+        }
+        else return 0;
+
+        if (rtDistance < 0) {
+            rtDistance = rt.size(role);
+        }
+        else {
+            rtDistance--;
+        }
+        return rtDistance;
     }
 
     void increasePendingQueries() {

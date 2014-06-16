@@ -101,8 +101,20 @@ public class D2Tree extends Peer {
         // isOnline = false;
         // break;
         case D2TreeMessageT.CONNECT_MSG:
+            Core.connect(msg);
+
             ConnectMessage connMsg = (ConnectMessage) msg.getData();
-            if (connMsg.getRole() == Role.RIGHT_A_NODE) Core.connect(msg);
+            long pNode = getPrecedingNode();
+            long sNode = getSucceedingNode();
+            long addedNode = connMsg.getNode();
+            if (pNode == addedNode || sNode == addedNode) {
+                if (needsSorting(pNode, sNode)) {
+                    int keysetSize = indexCore.keys.size();
+                    indexCore.keys.clear();
+                    indexCore.keys = generateRandomHandyValues(pNode, sNode,
+                            keysetSize);
+                }
+            }
             break;
         case D2TreeMessageT.REDISTRIBUTE_SETUP_REQ:
             Core.forwardBucketPreRedistributionRequest(msg);
@@ -307,16 +319,96 @@ public class D2Tree extends Peer {
         }
     }
 
-    static double generateRandomHandyValue(long leftAdjNodeID,
-            long rightAdjNodeID) {
-        D2Tree leftAdjNode = allNodes.get(leftAdjNodeID);
-        double minValue = Collections.min(leftAdjNode.indexCore.keys);
+    private static double getMinimumKeyBound(long precedingNodeID) {
+        D2Tree precedingNode = allNodes.get(precedingNodeID);
+        double minValue = -Double.MAX_VALUE;
+        if (precedingNode != null)
+            minValue = Collections.max(precedingNode.indexCore.keys);
+        return minValue;
+    }
 
-        D2Tree rightAdjNode = allNodes.get(rightAdjNodeID);
-        double maxValue = Collections.max(rightAdjNode.indexCore.keys);
+    private static double getMaximumKeyBound(long succeedingNodeID) {
+        D2Tree succeedingNode = allNodes.get(succeedingNodeID);
+        double maxValue = Double.MAX_VALUE;
+        if (succeedingNode != null)
+            maxValue = Collections.min(succeedingNode.indexCore.keys);
+        return maxValue;
+    }
+
+    static double generateRandomHandyValue(long precedingNodeID,
+            long succeedingNodeID) {
+        double minValue = getMinimumKeyBound(precedingNodeID);
+        double maxValue = getMaximumKeyBound(succeedingNodeID);
 
         assert maxValue > minValue;
         double diff = maxValue - minValue;
         return Math.random() * diff + minValue;
+    }
+
+    static ArrayList<Double> generateRandomHandyValues(long precedingNodeID,
+            long succeedingNodeID, int times) {
+        double minValue = getMinimumKeyBound(precedingNodeID);
+        double maxValue = getMaximumKeyBound(succeedingNodeID);
+
+        assert maxValue > minValue;
+        double diff = maxValue - minValue;
+        ArrayList<Double> generatedNumbers = new ArrayList<Double>();
+        for (int i = 0; i < times; i++)
+            generatedNumbers.add(Math.random() * diff + minValue);
+        return generatedNumbers;
+    }
+
+    long getPrecedingNode() {
+        RoutingTable rt = Core.getRT();
+        long pNodeID = RoutingTable.DEF_VAL;
+        if (!Core.isLeaf() && !Core.isBucketNode()) {
+            pNodeID = rt.get(Role.LEFT_A_NODE);
+            D2Tree pNode = allNodes.get(pNodeID);
+            RoutingTable pNodeRT = pNode.Core.getRT();
+            if (pNodeRT.contains(Role.LAST_BUCKET_NODE)) {
+                pNodeID = pNodeRT.get(Role.LAST_BUCKET_NODE);
+            }
+        }
+        else if (Core.isLeaf()) {
+            if (rt.contains(Role.LEFT_A_NODE))
+                pNodeID = rt.get(Role.LEFT_A_NODE);
+        }
+        else if (Core.isBucketNode()) {
+            if (rt.isEmpty(Role.LEFT_RT)) pNodeID = rt.get(Role.REPRESENTATIVE);
+            else pNodeID = rt.get(Role.LEFT_RT, 0);
+        }
+        return pNodeID;
+    }
+
+    long getSucceedingNode() {
+        RoutingTable rt = Core.getRT();
+        long sNodeID = RoutingTable.DEF_VAL;
+        if (!Core.isLeaf() && !Core.isBucketNode()) {
+            sNodeID = rt.get(Role.RIGHT_A_NODE);
+        }
+        else if (Core.isLeaf()) {
+            if (!rt.contains(Role.FIRST_BUCKET_NODE)) sNodeID = rt
+                    .get(Role.RIGHT_A_NODE);
+            else sNodeID = rt.get(Role.FIRST_BUCKET_NODE);
+        }
+        else if (Core.isBucketNode()) {
+            if (!rt.isEmpty(Role.RIGHT_RT)) sNodeID = rt.get(Role.RIGHT_RT, 0);
+            else {
+                long representativeID = rt.get(Role.REPRESENTATIVE);
+                D2Tree representative = allNodes.get(representativeID);
+                RoutingTable representativeRT = representative.Core.getRT();
+                sNodeID = representativeRT.get(Role.RIGHT_A_NODE);
+            }
+        }
+        return sNodeID;
+    }
+
+    private boolean needsSorting(long pNodeID, long sNodeID) {
+        double minAllowedValue = D2Tree.getMinimumKeyBound(pNodeID);
+        double maxAllowedValue = D2Tree.getMaximumKeyBound(sNodeID);
+        double minValue = Collections.min(indexCore.keys);
+        double maxValue = Collections.max(indexCore.keys);
+        if (minValue < minAllowedValue || maxValue > maxAllowedValue) return true;
+        else return false;
     }
 }
