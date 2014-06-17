@@ -114,7 +114,7 @@ public class D2TreeCore {
         assert msg.getData() instanceof JoinRequest;
         long newNodeId = msg.getSourceId();
 
-        assert !isBucketNode();
+        // assert !isBucketNode();
         if (isLeaf()) {
             if (mode == Mode.REDISTRIBUTION || mode == Mode.TRANSFER) {
                 printText = "Bucket is busy. Resending message to a neighbor.";
@@ -1133,6 +1133,37 @@ public class D2TreeCore {
             this.print(msg, data.getInitialNode());
             bucketNodeToLeftLeaf(msg);
         }
+        else if (counter == optimalBucketSize + 1 && data.buildsLeftLeaf()) {
+            // this is the last node of the left bucket. We need to move this to
+            // the front, in order to make index restructuring easier
+            // For that, we'll need the current first bucket node, the old leaf
+            // and the predecessor node
+            long leftLeaf = msg.getSourceId();
+            long rightLeaf = rt.get(Role.RIGHT_RT, 0);
+            long oldLeaf = rt.get(Role.REPRESENTATIVE);
+            long predecessor = rt.get(Role.LEFT_RT, 0);
+            long currentFN = data.getFirstBucketNode();
+
+            rt.unset(Role.LEFT_RT, 0, predecessor);
+            rt.set(Role.REPRESENTATIVE, leftLeaf);
+
+            // assert rt.isEmpty(Role.RIGHT_RT);
+
+            rt.unset(Role.RIGHT_RT);
+            rt.set(Role.RIGHT_RT, 0, currentFN);
+
+            send(new Message(id, leftLeaf, new ConnectMessage(predecessor,
+                    Role.LAST_BUCKET_NODE, true, initialNode)));
+            send(new Message(id, leftLeaf, new ConnectMessage(id,
+                    Role.FIRST_BUCKET_NODE, true, initialNode)));
+            send(new Message(id, predecessor, new DisconnectMessage(id,
+                    Role.RIGHT_RT, 0, initialNode)));
+            send(new Message(id, currentFN, new ConnectMessage(id,
+                    Role.LEFT_RT, 0, true, initialNode)));
+
+            msg.setDestinationId(rightLeaf);
+            send(msg);
+        }
         else if (counter > optimalBucketSize + 1 && data.buildsLeftLeaf()) {
             // the left bucket is full, make this a right leaf forward extend
             // response to the old leaf
@@ -1158,10 +1189,11 @@ public class D2TreeCore {
             oldLeaftoInnerNode(leftLeaf, rightLeaf, oldLeaf,
                     data.getInitialNode());
 
-            // set the left neighbor as the last bucket node of the left child
-            ConnectMessage conn = new ConnectMessage(rt.get(Role.LEFT_RT, 0),
-                    Role.LAST_BUCKET_NODE, true, initialNode);
-            send(new Message(id, leftLeaf, conn));
+            // // set the left neighbor as the last bucket node of the left
+            // child
+            // ConnectMessage conn = new ConnectMessage(rt.get(Role.LEFT_RT, 0),
+            // Role.LAST_BUCKET_NODE, true, initialNode);
+            // send(new Message(id, leftLeaf, conn));
             bucketNodeToRightLeaf(msg);
         }
         else {
@@ -1221,7 +1253,9 @@ public class D2TreeCore {
         long rightNeighbor = rt.get(Role.RIGHT_RT, 0);
 
         // forward the request to the right neighbor
+        data.setFirstBucketNode(rightNeighbor);
         msg.setSourceId(id);
+        msg.setData(data);
         msg.setDestinationId(rightNeighbor);
         send(msg);
 

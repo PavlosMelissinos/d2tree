@@ -198,7 +198,8 @@ public class PrintMessage extends MessageBody {
                     .format("\nPrinting Bucket of %d (navigation via bucket nodes' routing tables, starting from %d), size = %d \n%s",
                             leaf, leaf, properBucketSize,
                             properBucketIds.get(leaf));
-            int bucketSize = bucketIds.get(leaf).size();
+            int bucketSize = bucketIds.containsKey(leaf) ? bucketIds.get(leaf)
+                    .size() : 0;
             String text = String
                     .format("\nPrinting Bucket of %d (show all nodes with %d as a representatives), size = %d \n%s",
                             leaf, leaf, bucketSize, bucketIds.get(leaf));

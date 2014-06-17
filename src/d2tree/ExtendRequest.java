@@ -12,6 +12,7 @@ public class ExtendRequest extends MessageBody {
     private boolean           left;
     private long              optimalHeight;
     private long              currentHeight;
+    private long              fBNode;
 
     // public ExtendRequest(long optimalBucketSize, long oldOptimalBucketSize,
     // long initialNode) {
@@ -43,6 +44,14 @@ public class ExtendRequest extends MessageBody {
 
     public boolean buildsLeftLeaf() {
         return left;
+    }
+
+    public long getFirstBucketNode() {
+        return this.fBNode;
+    }
+
+    public void setFirstBucketNode(long node) {
+        this.fBNode = node;
     }
 
     // public long getOptimalBucketSize(){
