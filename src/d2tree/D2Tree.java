@@ -4,6 +4,7 @@ import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Random;
 import java.util.logging.Logger;
 
@@ -25,6 +26,9 @@ public class D2Tree extends Peer {
     // private int introducer;
     private static ArrayList<Integer>    introducers;
     private static HashMap<Long, D2Tree> allNodes;
+
+    private static double                MIN_VALUE = -1000000; // -Double.MAX_VALUE;
+    private static double                MAX_VALUE = 1000000; // Double.MAX_VALUE;
 
     private int getRandomIntroducer() {
         randomGenerator = new Random();
@@ -70,22 +74,30 @@ public class D2Tree extends Peer {
 
         int mType;
         PrintMessage.print(msg, "Node " + msg.getDestinationId() +
-                " received message from " + msg.getSourceId(),
-                PrintMessage.logDir + "messages.txt");
+                " received message from " + msg.getSourceId(), "messages.txt");
         mType = msg.getType();
 
         // HashMap<Role, Integer> oldInconsistencies = Core
         // .findRTInconsistencies();
         // boolean isInconsistent = false;
         // Core.findRTInconsistencies();
+        // long pNodeID = this.getPrecedingNode();
+        // long sNodeID = this.getSucceedingNode();
         switch (mType) {
         case D2TreeMessageT.JOIN_REQ:
             if (Core.isLeaf()) {
-                long lastBucketNode = Core.getRT().get(Role.LAST_BUCKET_NODE);
-                long rightAdjNode = Core.getRT().get(Role.RIGHT_A_NODE);
-                double value = D2Tree.generateRandomHandyValue(lastBucketNode,
-                        rightAdjNode);
-                indexCore.addValue(value);
+                RoutingTable coreRT = Core.getRT();
+                long precedingNode = coreRT.contains(Role.LAST_BUCKET_NODE) ? coreRT
+                        .get(Role.LAST_BUCKET_NODE) : Id;
+                long succeedingNode = Core.getRT().get(Role.RIGHT_A_NODE);
+                D2Tree newNode = allNodes.get(msg.getSourceId());
+                // assert newNode.indexCore.keys.isEmpty();
+                double value = D2Tree.generateRandomHandyValue(precedingNode,
+                        succeedingNode);
+                newNode.indexCore.keys.clear();
+                newNode.indexCore.addValue(value);
+                assert !newNode.indexCore.keys.isEmpty();
+                // assert
             }
             Core.forwardJoinRequest(msg);
             break;
@@ -93,28 +105,15 @@ public class D2Tree extends Peer {
             Core.forwardJoinResponse(msg);
             isOnline = true;
             break;
-        case D2TreeMessageT.DEPART_REQ:
+        case D2TreeMessageT.LEAVE_REQ:
             this.forwardLeaveRequest(msg);
             break;
-        // case D2TreeMessageT.DEPART_RES:
+        // case D2TreeMessageT.LEAVE_RES:
         // Core.forwardLeaveResponse(msg);
         // isOnline = false;
         // break;
         case D2TreeMessageT.CONNECT_MSG:
             Core.connect(msg);
-
-            ConnectMessage connMsg = (ConnectMessage) msg.getData();
-            long pNode = getPrecedingNode();
-            long sNode = getSucceedingNode();
-            long addedNode = connMsg.getNode();
-            if (pNode == addedNode || sNode == addedNode) {
-                if (needsSorting(pNode, sNode)) {
-                    int keysetSize = indexCore.keys.size();
-                    indexCore.keys.clear();
-                    indexCore.keys = generateRandomHandyValues(pNode, sNode,
-                            keysetSize);
-                }
-            }
             break;
         case D2TreeMessageT.REDISTRIBUTE_SETUP_REQ:
             Core.forwardBucketPreRedistributionRequest(msg);
@@ -138,6 +137,33 @@ public class D2Tree extends Peer {
             Core.forwardExtendContractRequest(msg);
             break;
         case D2TreeMessageT.EXTEND_REQ:
+            ExtendRequest data = (ExtendRequest) msg.getData();
+            int counter = msg.getHops();
+
+            // this is a bucket node
+            long oldOptimalBucketSize = data.getOldOptimalBucketSize();
+            // trick, accounts for odd vs even optimal sizes
+            long optimalBucketSize = (oldOptimalBucketSize - 1) / 2;
+            if (counter == optimalBucketSize + 1 && data.buildsLeftLeaf()) {
+                long leftLeaf = msg.getSourceId();
+                long oldLeaf = Core.getRT().get(Role.REPRESENTATIVE);
+
+                // move all the keys of this node to the old leaf
+                KeyReplacementRequest kRepData = new KeyReplacementRequest(Id,
+                        oldLeaf);
+                indexCore.forwardKeyReplacementRequest(new Message(leftLeaf,
+                        Id, kRepData), Core.getRT());
+
+                // tell old leaf to move all its keys to the new left leaf
+                KeyReplacementRequest kRepData2 = new KeyReplacementRequest(
+                        oldLeaf, leftLeaf);
+                Net.sendMsg(new Message(Id, oldLeaf, kRepData2));
+
+                // tell left leaf to move all its keys here
+                KeyReplacementRequest kRepData3 = new KeyReplacementRequest(
+                        leftLeaf, Id);
+                Net.sendMsg(new Message(Id, leftLeaf, kRepData3));
+            }
             Core.forwardExtendRequest(msg);
             break;
         case D2TreeMessageT.EXTEND_RES:
@@ -176,6 +202,8 @@ public class D2Tree extends Peer {
         case D2TreeMessageT.PRINT_MSG:
             Core.printTree(msg);
             break;
+        case D2TreeMessageT.REPLACE_KEY_REQ:
+            indexCore.forwardKeyReplacementRequest(msg, Core.getRT());
         default:
             System.out.println("Unrecognized message type: " + mType);
         }
@@ -321,17 +349,35 @@ public class D2Tree extends Peer {
 
     private static double getMinimumKeyBound(long precedingNodeID) {
         D2Tree precedingNode = allNodes.get(precedingNodeID);
-        double minValue = -Double.MAX_VALUE;
-        if (precedingNode != null)
+        double minValue = MIN_VALUE;
+        if (precedingNode != null && !precedingNode.indexCore.keys.isEmpty()) {
+            if (!precedingNode.Core.isLeaf() &&
+                    !precedingNode.Core.isBucketNode()) {
+                long ppNodeID = precedingNode.getPrecedingNode();
+                long psNodeID = precedingNode.getSucceedingNode();
+                if (precedingNode.needsSorting(ppNodeID, psNodeID)) {
+                    precedingNode = allNodes.get(ppNodeID);
+                }
+            }
             minValue = Collections.max(precedingNode.indexCore.keys);
+        }
         return minValue;
     }
 
     private static double getMaximumKeyBound(long succeedingNodeID) {
         D2Tree succeedingNode = allNodes.get(succeedingNodeID);
-        double maxValue = Double.MAX_VALUE;
-        if (succeedingNode != null)
+        double maxValue = MAX_VALUE;
+        if (succeedingNode != null && !succeedingNode.indexCore.keys.isEmpty()) {
+            if (!succeedingNode.Core.isLeaf() &&
+                    !succeedingNode.Core.isBucketNode()) {
+                long spNodeID = succeedingNode.getPrecedingNode();
+                long ssNodeID = succeedingNode.getSucceedingNode();
+                if (succeedingNode.needsSorting(spNodeID, ssNodeID)) {
+                    succeedingNode = allNodes.get(ssNodeID);
+                }
+            }
             maxValue = Collections.min(succeedingNode.indexCore.keys);
+        }
         return maxValue;
     }
 
@@ -340,9 +386,28 @@ public class D2Tree extends Peer {
         double minValue = getMinimumKeyBound(precedingNodeID);
         double maxValue = getMaximumKeyBound(succeedingNodeID);
 
+        if (maxValue < minValue) {
+            D2Tree pNode = allNodes.get(precedingNodeID);
+            D2Tree sNode = allNodes.get(succeedingNodeID);
+            try {
+                // for ()
+                ArrayList<Double> pKeys = pNode.indexCore.keys;
+                ArrayList<Double> sKeys = sNode.indexCore.keys;
+                throw new Exception("max: " + maxValue + " at succeedingNode " +
+                        succeedingNodeID + ", min: " + minValue +
+                        " at precedingNode " + precedingNodeID);
+            }
+            catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
         assert maxValue > minValue;
         double diff = maxValue - minValue;
-        return Math.random() * diff + minValue;
+        double generatedNumber = Math.random() * diff + minValue;
+
+        assert minValue < generatedNumber && generatedNumber < maxValue;
+        return generatedNumber;
     }
 
     static ArrayList<Double> generateRandomHandyValues(long precedingNodeID,
@@ -350,11 +415,27 @@ public class D2Tree extends Peer {
         double minValue = getMinimumKeyBound(precedingNodeID);
         double maxValue = getMaximumKeyBound(succeedingNodeID);
 
+        if (maxValue < minValue) {
+            D2Tree pNode = allNodes.get(precedingNodeID);
+            D2Tree sNode = allNodes.get(succeedingNodeID);
+            try {
+                throw new Exception("max: " + maxValue + " at succeedingNode " +
+                        succeedingNodeID + ", min: " + minValue +
+                        " at precedingNode " + precedingNodeID);
+            }
+            catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
         assert maxValue > minValue;
         double diff = maxValue - minValue;
         ArrayList<Double> generatedNumbers = new ArrayList<Double>();
+        if (times < 1) times = 1;
         for (int i = 0; i < times; i++)
             generatedNumbers.add(Math.random() * diff + minValue);
+
+        assert !generatedNumbers.isEmpty();
         return generatedNumbers;
     }
 
@@ -363,10 +444,15 @@ public class D2Tree extends Peer {
         long pNodeID = RoutingTable.DEF_VAL;
         if (!Core.isLeaf() && !Core.isBucketNode()) {
             pNodeID = rt.get(Role.LEFT_A_NODE);
-            D2Tree pNode = allNodes.get(pNodeID);
-            RoutingTable pNodeRT = pNode.Core.getRT();
-            if (pNodeRT.contains(Role.LAST_BUCKET_NODE)) {
-                pNodeID = pNodeRT.get(Role.LAST_BUCKET_NODE);
+            if (pNodeID != RoutingTable.DEF_VAL) {
+                D2Tree pNode = allNodes.get(pNodeID);
+
+                // assert pNode.Core.isLeaf();
+
+                RoutingTable pNodeRT = pNode.Core.getRT();
+                if (pNodeRT.contains(Role.LAST_BUCKET_NODE)) {
+                    pNodeID = pNodeRT.get(Role.LAST_BUCKET_NODE);
+                }
             }
         }
         else if (Core.isLeaf()) {
@@ -406,9 +492,42 @@ public class D2Tree extends Peer {
     private boolean needsSorting(long pNodeID, long sNodeID) {
         double minAllowedValue = D2Tree.getMinimumKeyBound(pNodeID);
         double maxAllowedValue = D2Tree.getMaximumKeyBound(sNodeID);
-        double minValue = Collections.min(indexCore.keys);
-        double maxValue = Collections.max(indexCore.keys);
+        // assert minAllowedValue <= maxAllowedValue;
+        if (minAllowedValue > maxAllowedValue) {
+            try {
+                throw new Exception("max: " + maxAllowedValue +
+                        " at succeedingNode " + sNodeID + ", min: " +
+                        minAllowedValue + " at precedingNode " + pNodeID);
+            }
+            catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        double minValue = indexCore.keys.isEmpty() ? MIN_VALUE : Collections
+                .min(indexCore.keys);
+        double maxValue = indexCore.keys.isEmpty() ? MAX_VALUE : Collections
+                .max(indexCore.keys);
+        // assert minValue < maxValue;
+        if (minValue > maxValue) {
+            try {
+                throw new Exception("max: " + maxValue + ", min: " + minValue +
+                        " at node " + this.Id);
+            }
+            catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
         if (minValue < minAllowedValue || maxValue > maxAllowedValue) return true;
         else return false;
+    }
+
+    static LinkedHashMap<Long, ArrayList<Double>> getAllKeys() {
+        LinkedHashMap<Long, ArrayList<Double>> keys = new LinkedHashMap<Long, ArrayList<Double>>();
+        for (D2Tree peer : allNodes.values()) {
+            keys.put(peer.Id, peer.indexCore.keys);
+        }
+        return keys;
     }
 }

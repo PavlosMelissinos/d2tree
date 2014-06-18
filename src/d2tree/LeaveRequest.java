@@ -102,7 +102,7 @@ public class LeaveRequest extends MessageBody {
 
     @Override
     public int getType() {
-        return D2TreeMessageT.DEPART_REQ;
+        return D2TreeMessageT.LEAVE_REQ;
     }
 
 }

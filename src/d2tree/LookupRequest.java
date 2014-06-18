@@ -17,26 +17,27 @@ public class LookupRequest extends MessageBody {
     private LookupMode        mode;
     private int               keyRTDistance;
     private LinkedList<Long>  queue;
-    private Bound             lowerBound;
-    private Bound             upperBound;
 
-    class Bound {
-        private double key;
-        private long   address;
-
-        Bound(double key, long address) {
-            this.key = key;
-            this.address = address;
-        }
-
-        double getKey() {
-            return this.key;
-        }
-
-        long getAddress() {
-            return this.address;
-        }
-    }
+    // private Bound lowerBound;
+    // private Bound upperBound;
+    //
+    // class Bound {
+    // private double key;
+    // private long address;
+    //
+    // Bound(double key, long address) {
+    // this.key = key;
+    // this.address = address;
+    // }
+    //
+    // double getKey() {
+    // return this.key;
+    // }
+    //
+    // long getAddress() {
+    // return this.address;
+    // }
+    // }
 
     public enum LookupMode {
         BALANCED, // this uses inner nodes as well, so it's probably
@@ -91,8 +92,8 @@ public class LookupRequest extends MessageBody {
         this.mode = LookupMode.VIA_LEAVES;
         this.keyRTDistance = -1;
         this.queue = new LinkedList<Long>();
-        this.lowerBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
-        this.upperBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
+        // this.lowerBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
+        // this.upperBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
     }
 
     public void setKeyRTDistance(int dist) {
@@ -134,34 +135,34 @@ public class LookupRequest extends MessageBody {
         return nextInQueue;
     }
 
-    public Bound getLowerBound() {
-        return this.lowerBound;
-    }
-
-    public Bound getUpperBound() {
-        return this.upperBound;
-    }
-
-    public void setLowerBound(double key, long address) {
-        this.lowerBound = new Bound(key, address);
-    }
-
-    public void setUpperBound(double key, long address) {
-        this.upperBound = new Bound(key, address);
-    }
-
-    public void updateBounds(double nodeMin, double nodeMax) {
-        assert nodeMin < nodeMax;
-        KeyPosition pos = KeyPosition.getPosition(key, nodeMin, nodeMax);
-        // TODO complete code
-        if (pos == KeyPosition.GREATER) {
-            if (nodeMax < this.upperBound.key) lowerBound.key = nodeMax;
-        }
-        else if (pos == KeyPosition.LESS) {
-            if (nodeMin > this.lowerBound.key) upperBound.key = nodeMin;
-        }
-        else if (nodeMax > key) {}
-    }
+    // public Bound getLowerBound() {
+    // return this.lowerBound;
+    // }
+    //
+    // public Bound getUpperBound() {
+    // return this.upperBound;
+    // }
+    //
+    // public void setLowerBound(double key, long address) {
+    // this.lowerBound = new Bound(key, address);
+    // }
+    //
+    // public void setUpperBound(double key, long address) {
+    // this.upperBound = new Bound(key, address);
+    // }
+    //
+    // public void updateBounds(double nodeMin, double nodeMax) {
+    // assert nodeMin < nodeMax;
+    // KeyPosition pos = KeyPosition.getPosition(key, nodeMin, nodeMax);
+    // // TODO complete code
+    // if (pos == KeyPosition.GREATER) {
+    // if (nodeMax < this.upperBound.key) lowerBound.key = nodeMax;
+    // }
+    // else if (pos == KeyPosition.LESS) {
+    // if (nodeMin > this.lowerBound.key) upperBound.key = nodeMin;
+    // }
+    // else if (nodeMax > key) {}
+    // }
 
     public boolean hasQueue() {
         return !queue.isEmpty();

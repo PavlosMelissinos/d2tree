@@ -109,7 +109,7 @@ public class RoutingTable implements Serializable {
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
         PrintMessage.print(new Message(id, id, data), printText,
-                PrintMessage.logDir + "conn-disconn.txt");
+                "conn-disconn.txt");
         if (value == id) throw new IllegalArgumentException();
     }
 
@@ -125,7 +125,7 @@ public class RoutingTable implements Serializable {
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
         PrintMessage.print(new Message(id, id, data), printText,
-                PrintMessage.logDir + "conn-disconn.txt");
+                "conn-disconn.txt");
         if (value == id) throw new IllegalArgumentException();
     }
 
@@ -151,7 +151,7 @@ public class RoutingTable implements Serializable {
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
         PrintMessage.print(new Message(id, id, data), printText,
-                PrintMessage.logDir + "conn-disconn.txt");
+                "conn-disconn.txt");
     }
 
     void unset(Role role, long oldValue) {
@@ -165,7 +165,7 @@ public class RoutingTable implements Serializable {
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
         PrintMessage.print(new Message(id, id, data), printText,
-                PrintMessage.logDir + "conn-disconn.txt");
+                "conn-disconn.txt");
     }
 
     void unset(Role role) {
@@ -187,7 +187,7 @@ public class RoutingTable implements Serializable {
                 "(replaced " + oldRT + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
         PrintMessage.print(new Message(id, id, data), printText,
-                PrintMessage.logDir + "conn-disconn.txt");
+                "conn-disconn.txt");
     }
 
     long get(Role role, int index) {
@@ -357,7 +357,7 @@ public class RoutingTable implements Serializable {
     }
 
     private synchronized void printDiscrepancies() {
-        String logFile = PrintMessage.logDir + "errors.txt";
+        String logFile = "errors.txt";
         PrintMessage data = new PrintMessage(D2TreeMessageT.PRINT_ERR_MSG, id);
         Message msg = new Message(id, id, data);
         PrintMessage.print(msg, discrepancies.toString(), logFile);

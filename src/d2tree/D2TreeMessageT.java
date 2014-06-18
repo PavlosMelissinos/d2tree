@@ -6,8 +6,8 @@ public class D2TreeMessageT extends MessageT {
     private static final long serialVersionUID       = 2160112452787414344L;
     static final int          JOIN_REQ               = 1001;
     static final int          JOIN_RES               = 1002;
-    static final int          DEPART_REQ             = 1003;
-    static final int          DEPART_RES             = 1004;
+    static final int          LEAVE_REQ             = 1003;
+    static final int          LEAVE_RES             = 1004;
 
     static final int          CONNECT_MSG            = 1011;
     static final int          DISCONNECT_MSG         = 1012;
@@ -36,6 +36,9 @@ public class D2TreeMessageT extends MessageT {
     static final int          VWUPDATE_REQ           = 2001;
     static final int          VWUPDATE_RES           = 2002;
 
+    static final int          REPLACE_KEY_REQ        = 2011;
+    static final int          REPLACE_KEY_RES        = 2012;
+
     // static final int LOOKUP_REQ = 1019;
     // static final int LOOKUP_RES = 1020;
     // static final int INSERT_REQ = 1021;
@@ -49,20 +52,31 @@ public class D2TreeMessageT extends MessageT {
             return "JOIN REQUEST";
         case JOIN_RES:
             return "JOIN RESPONSE";
+        case LEAVE_REQ:
+            return "DEPART REQUEST";
+        case LEAVE_RES:
+            return "DEPART RESPONSE";
+
         case CONNECT_MSG:
             return "CONNECT MESSAGE";
+        case DISCONNECT_MSG:
+            return "DISCONNECT REQUEST";
+
         case REDISTRIBUTE_REQ:
             return "REDISTRIBUTE REQUEST";
         case REDISTRIBUTE_RES:
             return "REDISTRIBUTE RESPONSE";
         case REDISTRIBUTE_SETUP_REQ:
             return "REDISTRIBUTE SETUP REQUEST";
+
         case GET_SUBTREE_SIZE_REQ:
             return "GET SUBTREE SIZE REQUEST";
         case GET_SUBTREE_SIZE_RES:
             return "GET SUBTREE SIZE RESPONSE";
+
         case CHECK_BALANCE_REQ:
             return "CHECK BALANCE REQUEST";
+
         case EXTEND_CONTRACT_REQ:
             return "EXTEND-CONTRACT REQUEST";
         case EXTEND_REQ:
@@ -71,16 +85,27 @@ public class D2TreeMessageT extends MessageT {
             return "EXTEND RESPONSE";
         case CONTRACT_REQ:
             return "CONTRACT REQUEST";
+
         case TRANSFER_REQ:
             return "TRANSFER REQUEST";
         case TRANSFER_RES:
             return "TRANSFER RESPONSE";
-        case DISCONNECT_MSG:
-            return "DISCONNECT REQUEST";
+
         case PRINT_MSG:
             return "PRINT MESSAGE";
         case PRINT_ERR_MSG:
             return "PRINT ERROR MESSAGE";
+
+        case VWUPDATE_REQ:
+            return "V.WEIGHT UPDATE REQUEST";
+        case VWUPDATE_RES:
+            return "V.WEIGHT UPDATE RESPONSE";
+
+        case REPLACE_KEY_REQ:
+            return "KEY REPLACEMENT REQUEST";
+        case REPLACE_KEY_RES:
+            return "KEY REPLACEMENT RESPONSE";
+
         default:
             return "WRONG TYPE";
         }

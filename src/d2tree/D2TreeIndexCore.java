@@ -16,16 +16,22 @@ public class D2TreeIndexCore {
     private long        id;
     ArrayList<Double>   keys;
     private int         pendingQueries;
-    static final String logIndexFile = PrintMessage.logIndexDir + "lookup.txt";
+    static final String indexLogFile = PrintMessage.indexLogDir + "lookup.txt";
     double              lVWeight;
     double              rVWeight;
     double              bVWeight;
     double              vWeight;
 
+    // legacy data
+    ArrayList<Double>   legacyKeys;
+    private long        legacyHost;
+
     D2TreeIndexCore(long id, Network network) {
         this.net = network;
         this.id = id;
         keys = new ArrayList<Double>();
+        legacyKeys = new ArrayList<Double>();
+        if (id == 1) keys.add(0.0);
         this.pendingQueries = 0;
         this.lVWeight = 0;
         this.rVWeight = 0;
@@ -38,6 +44,7 @@ public class D2TreeIndexCore {
         this.net = anotherIndexCore.net;
         this.bVWeight = anotherIndexCore.bVWeight;
         this.keys = anotherIndexCore.keys;
+        this.legacyKeys = anotherIndexCore.legacyKeys;
         this.pendingQueries = anotherIndexCore.pendingQueries;
         this.lVWeight = anotherIndexCore.lVWeight;
         this.rVWeight = anotherIndexCore.rVWeight;
@@ -176,7 +183,7 @@ public class D2TreeIndexCore {
         String printText = String
                 .format("Forwarding lookup request for key %d to %d", key,
                         targetNodeId);
-        PrintMessage.print(msg, printText, logIndexFile);
+        PrintMessage.print(msg, printText, indexLogFile);
     }
 
     private void resolveSubrequest(Message msg) {
@@ -207,7 +214,7 @@ public class D2TreeIndexCore {
                 .format("Request of type %s for key %d has reached target %d after %d hops",
                         MessageT.toString(msg.getType()), key, id,
                         msg.getHops());
-        PrintMessage.print(msg, printText, logIndexFile);
+        PrintMessage.print(msg, printText, indexLogFile);
 
     }
 
@@ -367,6 +374,86 @@ public class D2TreeIndexCore {
 
         long nextLookupTargetID = rt.get(role, rtDistance);
         return nextLookupTargetID;
+    }
+
+    void forwardKeyReplacementRequest(Message msg, RoutingTable rt) {
+        KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
+        boolean newKeysAreComing = !data.getKeys().isEmpty();
+        if (data.getDestinationPeer() == id) {
+            assert newKeysAreComing;
+            if (newKeysAreComing) {
+                this.legacyKeys = new ArrayList<Double>(keys);
+                this.keys = new ArrayList<Double>(data.getKeys());
+            }
+        }
+        else if (newKeysAreComing) {
+            msg.setDestinationId(data.getDestinationPeer());
+            net.sendMsg(msg);
+        }
+        else { // destination != id and new keys are not coming
+            if (!this.keys.isEmpty() && !this.legacyKeys.isEmpty()) {
+                data.setKeys(new ArrayList<Double>(legacyKeys));
+                this.legacyKeys = new ArrayList<Double>();
+
+                msg.setData(data);
+                msg.setDestinationId(data.getDestinationPeer());
+                net.sendMsg(msg);
+            }
+            else if (!this.keys.isEmpty()) {
+                this.legacyKeys = new ArrayList<Double>(this.keys);
+                this.keys = new ArrayList<Double>();
+
+                data.setKeys(new ArrayList<Double>(legacyKeys));
+                msg.setData(data);
+                msg.setDestinationId(data.getDestinationPeer());
+                net.sendMsg(msg);
+            }
+        }
+
+        // if (!this.keys.isEmpty() && !this.legacyKeys.isEmpty()) {
+        // // node has replaced its normal keys with new ones. Legacy is a
+        // // shadow copy of the old ones because they haven't been requested
+        // // yet.
+        // if (!newKeysAreComing) {
+        // data.setKeys(legacyKeys);
+        // msg.setDestinationId(data.getDestinationPeer());
+        // net.sendMsg(msg);
+        // }
+        // else
+        // ;// DUNNO
+        // }
+        // else if (!this.legacyKeys.isEmpty()) {
+        // // node has given its data somewhere
+        // if (newKeysAreComing) {
+        // this.legacyKeys = new ArrayList<Double>();
+        // this.keys = new ArrayList<Double>(data.getKeys());
+        // }
+        // else {
+        // // there is legacy data but the message has no new keys
+        // }
+        // }
+        // else if (!this.keys.isEmpty()) {
+        // // this is normal, balanced behavior
+        // if (newKeysAreComing) {
+        // // message disrupts the peace
+        // if (data.getDestinationPeer() == id) {
+        // this.legacyKeys = new ArrayList<Double>(keys);
+        // this.keys = new ArrayList<Double>(data.getKeys());
+        // }
+        // else {
+        // msg.setDestinationId(data.getDestinationPeer());
+        // net.sendMsg(msg);
+        // }
+        // }
+        // else {
+        // if (data.getDestinationPeer() != id) {
+        // this.legacyKeys = new ArrayList<Double>(keys);
+        // msg.setDestinationId(data.getDestinationPeer());
+        // net.sendMsg(msg);
+        // }
+        // }
+        //
+        // }
     }
 
     private boolean keyIsInRange(double key) {

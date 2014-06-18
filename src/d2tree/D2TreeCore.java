@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import p2p.simulator.message.Message;
@@ -1140,7 +1141,6 @@ public class D2TreeCore {
             // and the predecessor node
             long leftLeaf = msg.getSourceId();
             long rightLeaf = rt.get(Role.RIGHT_RT, 0);
-            long oldLeaf = rt.get(Role.REPRESENTATIVE);
             long predecessor = rt.get(Role.LEFT_RT, 0);
             long currentFN = data.getFirstBucketNode();
 
@@ -1801,17 +1801,16 @@ public class D2TreeCore {
         PrintMessage data = (PrintMessage) msg.getData();
         // long id = msg.getDestinationId();
 
-        String compactLogFile = PrintMessage.logDir + "main" +
-                data.getInitialNode() + ".txt";
-        String logFile = PrintMessage.logDir + "main" + data.getInitialNode() +
-                "-" + msg.getMsgId() + ".txt";
+        String compactLogFile = "main" + data.getInitialNode() + ".txt";
+        String logFile = "main" + data.getInitialNode() + "-" + msg.getMsgId() +
+                ".txt";
 
-        System.out.println(logFile.substring(logFile.lastIndexOf('/')));
+        System.out.println(logFile);
         // TODO Could the removal of a peer (contract) cause problems in the
         // loop? - test this case
 
         try {
-            HashMap<Long, RoutingTable> peerRTs = new HashMap<Long, RoutingTable>(
+            LinkedHashMap<Long, RoutingTable> peerRTs = new LinkedHashMap<Long, RoutingTable>(
                     routingTables);
 
             printText = "Printing Tree (grouped by tree level)";
@@ -1835,11 +1834,6 @@ public class D2TreeCore {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-
-        // String objectFile = PrintMessage.logDir + "routTable.bin";
-        // String binLogFile = PrintMessage.logDir + "main" +
-        // data.getInitialNode() + "-" + msg.getMsgId() + ".bin";
-        // serializePeers(msg.getMsgId(), binLogFile);
     }
 
     boolean isLeaf() {

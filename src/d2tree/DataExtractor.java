@@ -1,15 +1,15 @@
 package d2tree;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import d2tree.RoutingTable.Role;
 
 public class DataExtractor {
-    static HashMap<Long, ArrayList<Long>> getBucketNodes(
-            HashMap<Long, RoutingTable> peers) {
-        HashMap<Long, ArrayList<Long>> bucketNodes = new HashMap<Long, ArrayList<Long>>();
+    static LinkedHashMap<Long, ArrayList<Long>> getBucketNodes(
+            LinkedHashMap<Long, RoutingTable> peers) {
+        LinkedHashMap<Long, ArrayList<Long>> bucketNodes = new LinkedHashMap<Long, ArrayList<Long>>();
         for (Long peerId : peers.keySet()) {
             RoutingTable peerRT = peers.get(peerId);
             if (peerRT.isBucketNode()) {
@@ -24,19 +24,22 @@ public class DataExtractor {
         return bucketNodes;
     }
 
-    static ArrayList<Long> getOrderedBucketNodes(
-            HashMap<Long, RoutingTable> myRoutingTables, long bucketId) {
-        ArrayList<Long> bucketNodes = new ArrayList<Long>();
+    static LinkedHashMap<Long, ArrayList<Double>> getOrderedBucketNodes(
+            LinkedHashMap<Long, RoutingTable> myRoutingTables, long bucketId) {
+        LinkedHashMap<Long, ArrayList<Double>> bucketNodes = new LinkedHashMap<Long, ArrayList<Double>>();
         RoutingTable leafRT = myRoutingTables.get(bucketId);
         Long bucketNodeId = leafRT.get(Role.FIRST_BUCKET_NODE);
+        LinkedHashMap<Long, ArrayList<Double>> keys = D2Tree.getAllKeys();
+
         assert bucketNodeId != RoutingTable.DEF_VAL;
-        bucketNodes.add(bucketNodeId);
+
+        bucketNodes.put(bucketNodeId, keys.get(bucketNodeId));
         RoutingTable bucketNodeRT = myRoutingTables.get(bucketNodeId);
         while (!bucketNodeRT.isEmpty(Role.RIGHT_RT)) {
             bucketNodeId = bucketNodeRT.get(Role.RIGHT_RT, 0);
-            if (bucketNodes.contains(bucketNodeId))
-                bucketNodes.add(bucketNodeId);
-            bucketNodes.add(bucketNodeId);
+            if (bucketNodes.containsKey(bucketNodeId))
+                bucketNodes.put(bucketNodeId, keys.get(bucketNodeId));
+            bucketNodes.put(bucketNodeId, keys.get(bucketNodeId));
             bucketNodeRT = myRoutingTables.get(bucketNodeId);
         }
 
@@ -81,7 +84,8 @@ public class DataExtractor {
     //
     // }
 
-    // static ArrayList<Long> getChildren(HashMap<Long, RoutingTable> peers,
+    // static ArrayList<Long> getChildren(LinkedHashMap<Long, RoutingTable>
+    // peers,
     // long node) {
     //
     // }
