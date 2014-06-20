@@ -11,7 +11,7 @@ import p2p.simulator.message.MessageBody;
 
 public class LookupRequest extends MessageBody {
     private static final long serialVersionUID = 6809029793982822930L;
-    private double            key;
+    private long              key;
     private KeyPosition       pos;
     private LookupPhase       phase;
     private LookupMode        mode;
@@ -50,8 +50,7 @@ public class LookupRequest extends MessageBody {
         L_ADJ,
         R_ADJ,
         NONE;
-        static KeyPosition getPosition(double key, double minRange,
-                double maxRange) {
+        static KeyPosition getPosition(long key, long minRange, long maxRange) {
             if (key < minRange) return LESS;
             else if (key > maxRange) return GREATER;
             else if (key == minRange) return L_ADJ;
@@ -168,7 +167,7 @@ public class LookupRequest extends MessageBody {
         return !queue.isEmpty();
     }
 
-    public double getKey() {
+    public long getKey() {
         return this.key;
     }
 

@@ -369,12 +369,14 @@ public class RoutingTable implements Serializable {
                 !contains(Role.LEFT_CHILD) && !contains(Role.RIGHT_CHILD);
         if (itIs && !contains(Role.FIRST_BUCKET_NODE)) {
             try {
-                PrintWriter out = new PrintWriter(new FileWriter(
-                        PrintMessage.logDir + "isLeaf.log", true));
-                new RuntimeException().printStackTrace(out);
-                out.print("ID = " + id + ", ");
-                print(out);
-                out.close();
+                if (PrintMessage.PRINTS_ENABLED) {
+                    PrintWriter out = new PrintWriter(new FileWriter(
+                            PrintMessage.logDir + "isLeaf.log", true));
+                    new RuntimeException().printStackTrace(out);
+                    out.print("ID = " + id + ", ");
+                    print(out);
+                    out.close();
+                }
                 Thread.sleep(2000);
                 return !contains(Role.REPRESENTATIVE) &&
                         !contains(Role.LEFT_CHILD) &&

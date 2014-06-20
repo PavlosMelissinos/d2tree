@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.TreeSet;
 
 import p2p.simulator.message.Message;
 import p2p.simulator.message.MessageBody;
@@ -27,13 +28,14 @@ import d2tree.RoutingTable.Role;
 public class PrintMessage extends MessageBody {
 
     // private boolean down;
-    private long        initialNode;
-    private int         msgType;
-    static final String logDir      = "D:/logs/";
-    static final String indexLogDir = logDir + "index/";
+    private long         initialNode;
+    private int          msgType;
+    static final String  logDir         = "D:/logs/";
+    static final String  indexLogDir    = logDir + "index/";
     // public static String logDir = "../logs/";
-    static final String allLogFile  = logDir + "main.txt";
-    static final String treeLogFile = logDir + "tree.txt";
+    static final String  allLogFile     = logDir + "main.txt";
+    static final String  treeLogFile    = logDir + "tree.txt";
+    static final boolean PRINTS_ENABLED = true;
 
     // static final String indexLogFile = logIndexDir + "tree.txt";
 
@@ -71,6 +73,7 @@ public class PrintMessage extends MessageBody {
 
     static public synchronized void print(Message msg, String printText,
             String logFile) {
+        if (!PrintMessage.PRINTS_ENABLED) return;
         try {
             if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
                     !logFile.equals(PrintMessage.logDir + "conn-disconn.txt") &&
@@ -78,8 +81,8 @@ public class PrintMessage extends MessageBody {
                 // System.out.println(logFile.substring(logFile.lastIndexOf('/')));
                 System.out.println(logFile);
             }
-            PrintWriter out = new PrintWriter(new FileWriter(
-                    PrintMessage.logDir + logFile, true));
+            PrintWriter out = new PrintWriter(new FileWriter(indexLogDir +
+                    logFile, true));
 
             // PrintMessage data = (PrintMessage) msg.getData();
             out.format("\n%s(MID = %d): %s",
@@ -95,6 +98,7 @@ public class PrintMessage extends MessageBody {
 
     static public synchronized void print(Message msg, String printText,
             String logFile, long initialNode, boolean stdOutFlag) {
+        if (!PrintMessage.PRINTS_ENABLED) return;
         try {
             if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
                     stdOutFlag) {
@@ -115,16 +119,16 @@ public class PrintMessage extends MessageBody {
 
     }
 
-    static ArrayList<LinkedHashMap<Long, ArrayList<Double>>> getPeerIdsByTreeLevel(
+    static ArrayList<LinkedHashMap<Long, TreeSet<Long>>> getPeerIdsByTreeLevel(
             HashMap<Long, RoutingTable> myPeers) {
         // group peers by tree level
-        LinkedHashMap<Long, ArrayList<Double>> currentLevelNodes = new LinkedHashMap<Long, ArrayList<Double>>();
-        LinkedHashMap<Long, ArrayList<Double>> nextLevelNodes = new LinkedHashMap<Long, ArrayList<Double>>();
-        LinkedHashMap<Long, ArrayList<Double>> keys = D2Tree.getAllKeys();
+        LinkedHashMap<Long, TreeSet<Long>> currentLevelNodes = new LinkedHashMap<Long, TreeSet<Long>>();
+        LinkedHashMap<Long, TreeSet<Long>> nextLevelNodes = new LinkedHashMap<Long, TreeSet<Long>>();
+        LinkedHashMap<Long, TreeSet<Long>> keys = D2Tree.getAllKeys();
 
         currentLevelNodes.put(1L, keys.get(1L));
 
-        ArrayList<LinkedHashMap<Long, ArrayList<Double>>> allPeers = new ArrayList<LinkedHashMap<Long, ArrayList<Double>>>();
+        ArrayList<LinkedHashMap<Long, TreeSet<Long>>> allPeers = new ArrayList<LinkedHashMap<Long, TreeSet<Long>>>();
         while (!currentLevelNodes.isEmpty()) {
             allPeers.add(currentLevelNodes);
             for (Long peerId : currentLevelNodes.keySet()) {
@@ -143,7 +147,7 @@ public class PrintMessage extends MessageBody {
                         nextLevelNodes.put(rightChild, keys.get(rightChild));
                 }
             }
-            currentLevelNodes = new LinkedHashMap<Long, ArrayList<Double>>(
+            currentLevelNodes = new LinkedHashMap<Long, TreeSet<Long>>(
                     nextLevelNodes);
             nextLevelNodes.clear();
         }
@@ -153,10 +157,11 @@ public class PrintMessage extends MessageBody {
     static void printPBT(Message msg,
             LinkedHashMap<Long, RoutingTable> peerRTs, String logFile)
             throws IOException {
+        if (!PrintMessage.PRINTS_ENABLED) return;
 
-        ArrayList<LinkedHashMap<Long, ArrayList<Double>>> pbtPeers = PrintMessage
+        ArrayList<LinkedHashMap<Long, TreeSet<Long>>> pbtPeers = PrintMessage
                 .getPeerIdsByTreeLevel(peerRTs);
-        for (LinkedHashMap<Long, ArrayList<Double>> peers : pbtPeers) {
+        for (LinkedHashMap<Long, TreeSet<Long>> peers : pbtPeers) {
 
             PrintWriter out = null;
             out = new PrintWriter(new FileWriter(logDir + logFile, true));
@@ -169,7 +174,7 @@ public class PrintMessage extends MessageBody {
             out.println(peers);
             out.close();
 
-            out = new PrintWriter(new FileWriter(indexLogDir + logFile, true));
+            out = new PrintWriter(new FileWriter(logDir + logFile, true));
             out.print("\n\n");
             out.println(peers);
             out.close();
@@ -201,14 +206,15 @@ public class PrintMessage extends MessageBody {
 
     static void printBuckets(LinkedHashMap<Long, RoutingTable> peerRTs,
             String logFile) throws IOException {
+        if (!PrintMessage.PRINTS_ENABLED) return;
 
-        ArrayList<LinkedHashMap<Long, ArrayList<Double>>> pbtPeers = PrintMessage
+        ArrayList<LinkedHashMap<Long, TreeSet<Long>>> pbtPeers = PrintMessage
                 .getPeerIdsByTreeLevel(peerRTs);
         LinkedHashMap<Long, ArrayList<Long>> bucketIds = DataExtractor
                 .getBucketNodes(peerRTs);
 
-        LinkedHashMap<Long, LinkedHashMap<Long, ArrayList<Double>>> properBucketIds = new LinkedHashMap<Long, LinkedHashMap<Long, ArrayList<Double>>>();
-        LinkedHashMap<Long, ArrayList<Double>> leaves = pbtPeers.get(pbtPeers
+        LinkedHashMap<Long, LinkedHashMap<Long, TreeSet<Long>>> properBucketIds = new LinkedHashMap<Long, LinkedHashMap<Long, TreeSet<Long>>>();
+        LinkedHashMap<Long, TreeSet<Long>> leaves = pbtPeers.get(pbtPeers
                 .size() - 1);
         for (Long leaf : leaves.keySet()) {
             properBucketIds.put(leaf,
@@ -272,6 +278,7 @@ public class PrintMessage extends MessageBody {
 
     static void printTreeByIndex(List<D2TreeCore> peers, Message msg,
             String logFile) throws IOException {
+        if (!PrintMessage.PRINTS_ENABLED) return;
         PrintMessage data = (PrintMessage) msg.getData();
         long id = msg.getDestinationId();
         if (id == msg.getSourceId()) {

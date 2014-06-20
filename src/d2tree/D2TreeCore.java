@@ -824,6 +824,12 @@ public class D2TreeCore {
         // if this is the first time we visit dest, connect its last node to
         // the first node of pivot
         if (hopsIndex == 1) {
+            if (!rt.isEmpty(Role.RIGHT_RT) &&
+                    rt.get(Role.RIGHT_RT, 0) != pivotNode) {
+                this.printText = "First right neighbor is " +
+                        rt.get(Role.RIGHT_RT, 0);
+                print(msg, transfData.getInitialNode());
+            }
             assert rt.isEmpty(Role.RIGHT_RT) ||
                     rt.get(Role.RIGHT_RT, 0) == pivotNode;
             assert pivotNode != RoutingTable.DEF_VAL;
@@ -2015,6 +2021,7 @@ public class D2TreeCore {
 
     void print(Message msg, String printText, long initialNode) {
         // this.findRTInconsistencies();
+        if (!PrintMessage.PRINTS_ENABLED) return;
         try {
             String logFile = PrintMessage.logDir + "state" + initialNode +
                     ".txt";
@@ -2043,6 +2050,7 @@ public class D2TreeCore {
 
     static void printErr(Exception ex, long initialNode) {
         ex.printStackTrace();
+        if (!PrintMessage.PRINTS_ENABLED) return;
         try {
             String logFile = PrintMessage.logDir + "errors" + initialNode +
                     ".txt";

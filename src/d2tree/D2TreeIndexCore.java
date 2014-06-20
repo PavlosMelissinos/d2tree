@@ -2,10 +2,15 @@ package d2tree;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.TreeSet;
 
+import p2p.simulator.message.DeleteResponse;
+import p2p.simulator.message.InsertResponse;
+import p2p.simulator.message.LookupResponse;
 import p2p.simulator.message.Message;
 import p2p.simulator.message.MessageT;
 import p2p.simulator.network.Network;
+import d2tree.KeyReplacementRequest.Mode;
 import d2tree.LookupRequest.KeyPosition;
 import d2tree.LookupRequest.LookupMode;
 import d2tree.LookupRequest.LookupPhase;
@@ -14,24 +19,30 @@ import d2tree.RoutingTable.Role;
 public class D2TreeIndexCore {
     Network             net;
     private long        id;
-    ArrayList<Double>   keys;
+    TreeSet<Long>       keys;
     private int         pendingQueries;
-    static final String indexLogFile = PrintMessage.indexLogDir + "lookup.txt";
+    // static final String indexLogFile = PrintMessage.indexLogDir +
+    // "lookup.txt";
+    static final String indexLogFile = "lookup.txt";
     double              lVWeight;
     double              rVWeight;
     double              bVWeight;
     double              vWeight;
 
     // legacy data
-    ArrayList<Double>   legacyKeys;
+    TreeSet<Long>       legacyKeys;
     private long        legacyHost;
+
+    static long         MIN_VALUE    = -1000000;    // -Long.MAX_VALUE;
+    static long         MAX_VALUE    = 1000000;     // Long.MAX_VALUE;
 
     D2TreeIndexCore(long id, Network network) {
         this.net = network;
         this.id = id;
-        keys = new ArrayList<Double>();
-        legacyKeys = new ArrayList<Double>();
-        if (id == 1) keys.add(0.0);
+        keys = new TreeSet<Long>();
+        if (id == 1) keys.add(0L);
+        legacyKeys = new TreeSet<Long>();
+        // legacyKeys.add();
         this.pendingQueries = 0;
         this.lVWeight = 0;
         this.rVWeight = 0;
@@ -61,7 +72,7 @@ public class D2TreeIndexCore {
         // if (msg != null) return;
 
         LookupRequest data = (LookupRequest) msg.getData();
-        double key = data.getKey();
+        long key = data.getKey();
 
         // //uncomment when ready
         // data.updateBounds(Collections.min(keys), Collections.max(keys));
@@ -72,8 +83,15 @@ public class D2TreeIndexCore {
             resolveSubrequest(msg);
         }
         else if (data.getLookupMode() == LookupMode.VIA_LEAVES) {
-            KeyPosition pos = KeyPosition.getPosition(key,
-                    Collections.min(keys), Collections.max(keys));
+            KeyPosition pos = KeyPosition.GREATER;
+            if (!keys.isEmpty()) {
+                pos = KeyPosition.getPosition(key, Collections.min(keys),
+                        Collections.max(keys));
+            }
+            else if (coreRT.isEmpty(Role.RIGHT_RT)) {
+                pos = KeyPosition.LESS;
+            }
+
             if (!coreRT.isLeaf() && !coreRT.isBucketNode()) {
                 if (pos == KeyPosition.GREATER) targetNodeId = coreRT
                         .get(Role.RIGHT_A_NODE);
@@ -82,7 +100,7 @@ public class D2TreeIndexCore {
                 msg.setDestinationId(targetNodeId);
                 data.setKeyPosition(pos);
                 msg.setData(data);
-                net.sendMsg(msg);
+                send(msg);
             }
             else if (coreRT.isLeaf()) {
                 int keyDistance = data.getKeyRTDistance();
@@ -91,13 +109,17 @@ public class D2TreeIndexCore {
                 if (pos == KeyPosition.GREATER) role = Role.RIGHT_RT;
                 else role = Role.LEFT_RT;
 
-                if (keyDistance < 0) {
-                    keyDistance = coreRT.size(role);
-                    targetNodeId = coreRT.get(role, keyDistance - 1);
-                }
-                else if (keyDistance > 1) {
+                if (keyDistance < 0) keyDistance = coreRT.size(role) + 1;
+
+                if (keyDistance > 1) {
                     keyDistance--;
                     targetNodeId = coreRT.get(role, keyDistance - 1);
+                    System.out.println("KEY DISTANCE: " + keyDistance + " vs " +
+                            role + " Size: " + coreRT.size(role) + " for RT: " +
+                            coreRT);
+                    assert keyDistance <= coreRT.size(role);
+                    assert keyDistance >= 1;
+                    assert targetNodeId != RoutingTable.DEF_VAL;
                 }
                 else {
                     assert keyDistance == 1;
@@ -105,25 +127,33 @@ public class D2TreeIndexCore {
                         targetNodeId = coreRT.get(Role.LAST_BUCKET_NODE);
                         data.addToQueue(coreRT.get(Role.RIGHT_A_NODE));
                         data.addToQueue(coreRT.get(Role.RIGHT_RT, 0));
+                        assert targetNodeId != RoutingTable.DEF_VAL;
                     }
                     else {
                         assert pos == KeyPosition.LESS;
+                        if (coreRT.isEmpty(Role.LEFT_RT)) {
+                            resolveSubrequest(msg);
+                            return;
+                        }
                         targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+                        assert targetNodeId != RoutingTable.DEF_VAL;
                     }
+                    assert targetNodeId != RoutingTable.DEF_VAL;
                 }
 
                 msg.setDestinationId(targetNodeId);
                 data.setKeyPosition(pos);
                 data.setKeyRTDistance(keyDistance);
                 msg.setData(data);
-                net.sendMsg(msg);
+                send(msg);
             }
             else {
                 assert coreRT.isBucketNode();
                 if (pos == KeyPosition.LESS) {
                     if (coreRT.isEmpty(Role.LEFT_RT)) {
-                        msg.setDestinationId(targetNodeId);
-                        resolveSubrequest(msg, targetNodeId);
+                        targetNodeId = id;
+                        // msg.setDestinationId(targetNodeId);
+                        resolveSubrequest(msg);
                         return;
                     }
                     else {
@@ -137,10 +167,11 @@ public class D2TreeIndexCore {
                         msg.setDestinationId(targetNodeId);
                         data.setKeyPosition(pos);
                         msg.setData(data);
-                        net.sendMsg(msg);
+                        send(msg);
                     }
                     else {
                         resolveSubrequest(msg);
+                        return;
                     }
                 }
             }
@@ -150,7 +181,7 @@ public class D2TreeIndexCore {
         }
     }
 
-    void slowLookup(Message msg, double key, long targetNodeId) {
+    void slowLookup(Message msg, long key, long targetNodeId) {
 
         LookupRequest data = (LookupRequest) msg.getData();
         LookupPhase phase = data.getLookupPhase();
@@ -179,7 +210,7 @@ public class D2TreeIndexCore {
         data.setKeyPosition(pos);
         msg.setData(data);
         msg.setDestinationId(targetNodeId);
-        net.sendMsg(msg);
+        send(msg);
         String printText = String
                 .format("Forwarding lookup request for key %d to %d", key,
                         targetNodeId);
@@ -192,23 +223,26 @@ public class D2TreeIndexCore {
 
     private void resolveSubrequest(Message msg, long dest) {
         LookupRequest data = (LookupRequest) msg.getData();
-        double key = data.getKey();
+        long key = data.getKey();
         this.decreasePendingQueries();
         boolean keyExists = keys.contains(key);
         if (msg.getType() == MessageT.INSERT_REQ) {
             if (!keyExists) keys.add(key);
             InsertResponse rData = new InsertResponse(key, keyExists, msg);
-            net.sendMsg(new Message(id, dest, rData));
+            if (dest == id) lookupResponse();
+            else send(new Message(id, dest, rData));
         }
         else if (msg.getType() == MessageT.DELETE_REQ) {
             if (keyExists) keys.remove(key);
             DeleteResponse rData = new DeleteResponse(key, keyExists, msg);
-            net.sendMsg(new Message(id, dest, rData));
+            if (dest == id) lookupResponse();
+            else send(new Message(id, dest, rData));
         }
         else {
             assert msg.getType() == MessageT.LOOKUP_REQ;
             LookupResponse rData = new LookupResponse(key, keyExists, msg);
-            net.sendMsg(new Message(id, dest, rData));
+            if (dest == id) lookupResponse();
+            else send(new Message(id, dest, rData));
         }
         String printText = String
                 .format("Request of type %s for key %d has reached target %d after %d hops",
@@ -218,20 +252,21 @@ public class D2TreeIndexCore {
 
     }
 
-    void addValue(double value) {
+    void addValue(long value) {
         this.keys.add(value);
     }
 
-    boolean directionHasChanged(double key, KeyPosition pos) {
-        double minRange = Collections.min(keys);
-        double maxRange = Collections.max(keys);
+    boolean directionHasChanged(long key, KeyPosition pos) {
+        if (keys.isEmpty()) return false;
+        long minRange = Collections.min(keys);
+        long maxRange = Collections.max(keys);
         KeyPosition newPos = KeyPosition.getPosition(key, minRange, maxRange);
         return newPos != pos;
     }
 
     // initially KeyPosition is NEITHER, lookup phase is FIRST
     long nextLookupTarget(LookupRequest data, RoutingTable coreRT) {
-        double key = data.getKey();
+        long key = data.getKey();
         KeyPosition pos = data.getKeyPosition();
         LookupPhase phase = data.getLookupPhase();
         if (keys.isEmpty()) return id;
@@ -344,12 +379,12 @@ public class D2TreeIndexCore {
             long destId = rt.get(Role.PARENT);
             msg.setData(data);
             msg.setDestinationId(destId);
-            net.sendMsg(msg);
+            send(msg);
         }
         else {
             long unevenSubtree = sourceId;
             VWUpdateResponse rData = new VWUpdateResponse(unevenSubtree);
-            net.sendMsg(new Message(id, data.getOriginalNode(), rData));
+            send(new Message(id, data.getOriginalNode(), rData));
         }
     }
 
@@ -378,85 +413,174 @@ public class D2TreeIndexCore {
 
     void forwardKeyReplacementRequest(Message msg, RoutingTable rt) {
         KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
+        if (data.getMode() == Mode.MANUAL) {
+            forwardManualKeyReplacementRequest(msg, rt);
+        }
+        else if (data.getMode() == Mode.INORDER ||
+                data.getMode() == Mode.REVERSE_INORDER) {
+            forwardInorderKeyReplacementRequest(msg, rt);
+        }
+    }
+
+    private void forwardInorderKeyReplacementRequest(Message msg,
+            RoutingTable rt) {
+        KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
+        // ArrayList<Long> tempKeys;
+        long destinationID = msg.getDestinationId();
+        // tempKeys = new ArrayList<Long>(this.keys);
+        TreeSet<Long> movingKeys;
+        TreeSet<Long> stayingKeys;
+
+        assert !data.getKeys().isEmpty();
+        // assert !keys.isEmpty() || !legacyKeys.isEmpty();
+        if (data.getDestinationPeer() == id) {
+            // assert keys.isEmpty();
+            this.keys.addAll(new TreeSet<Long>(data.getKeys()));
+            this.legacyKeys.clear();
+            return;
+        }
+        if (keys.isEmpty()) {
+            assert !legacyKeys.isEmpty();
+            movingKeys = new TreeSet<Long>(data.getKeys());
+            stayingKeys = new TreeSet<Long>();
+        }
+        else if (data.getMode() == Mode.INORDER) {
+            // assert this.keys.get(0) > data.getKeys().get(0);
+            // TreeSet<Long> allKeys = new TreeSet<Long>(data.getKeys());
+            // allKeys.addAll(this.keys);
+            ArrayList<Long> allKeys = new ArrayList<Long>(data.getKeys());
+            allKeys.addAll(this.keys);
+            Collections.sort(allKeys);
+
+            int movingSize = data.getKeys().size();
+            int stayingSize = allKeys.size() - movingSize;
+            stayingKeys = new TreeSet<Long>(allKeys.subList(0, stayingSize));
+            movingKeys = new TreeSet<Long>(allKeys.subList(stayingSize,
+                    stayingSize + movingSize));
+
+            assert stayingKeys.last() <= movingKeys.first();
+        }
+        else {
+            assert data.getMode() == Mode.REVERSE_INORDER;
+            // assert this.keys.get(0) < data.getKeys().get(0);
+            ArrayList<Long> allKeys = new ArrayList<Long>(data.getKeys());
+            allKeys.addAll(this.keys);
+            Collections.sort(allKeys);
+
+            int movingSize = data.getKeys().size();
+            int stayingSize = allKeys.size() - movingSize;
+            stayingKeys = new TreeSet<Long>(allKeys.subList(movingSize,
+                    movingSize + stayingSize));
+            movingKeys = new TreeSet<Long>(allKeys.subList(0, movingSize));
+
+            assert movingKeys.last() <= stayingKeys.first();
+        }
+        if (legacyKeys.isEmpty()) {
+            assert !keys.isEmpty();
+            legacyKeys.addAll(new TreeSet<Long>(this.keys));
+        }
+        else if (!stayingKeys.isEmpty()) legacyKeys.clear();
+
+        assert !movingKeys.isEmpty();
+        data.setKeys(movingKeys);
+        this.keys = stayingKeys;
+
+        if (data.getMode() == Mode.INORDER) {
+            if (rt.isLeaf()) {
+                data.reverseBucketVisits();
+                if (data.visitsBuckets()) {
+                    destinationID = rt.get(Role.FIRST_BUCKET_NODE);
+                }
+                else {
+                    destinationID = rt.get(Role.RIGHT_A_NODE);
+                    if (destinationID == RoutingTable.DEF_VAL) {
+                        destinationID = rt.get(Role.LAST_BUCKET_NODE);
+                        data.forcedInsertion(true);
+                    }
+                }
+            }
+            else if (rt.isBucketNode()) {
+                if (rt.isEmpty(Role.RIGHT_RT)) {
+                    if (data.insertionIsForced()) {
+                        this.keys.addAll(movingKeys);
+                        assert !keys.isEmpty() || !legacyKeys.isEmpty();
+                        return;
+                    }
+                    else destinationID = rt.get(Role.REPRESENTATIVE);
+                }
+                else destinationID = rt.get(Role.RIGHT_RT, 0);
+            }
+            else {
+                destinationID = rt.get(Role.RIGHT_A_NODE);
+            }
+        }
+        else {
+            assert data.getMode() == Mode.REVERSE_INORDER;
+            if (rt.isLeaf()) {
+                data.reverseBucketVisits();
+                if (data.visitsBuckets()) {
+                    destinationID = rt.get(Role.LAST_BUCKET_NODE);
+                }
+                else {
+                    destinationID = rt.get(Role.LEFT_A_NODE);
+                    if (destinationID == RoutingTable.DEF_VAL) {
+                        this.keys.addAll(movingKeys);
+                        assert !keys.isEmpty() || !legacyKeys.isEmpty();
+                        return;
+                    }
+                }
+            }
+            else if (rt.isBucketNode()) {
+                if (rt.isEmpty(Role.LEFT_RT)) destinationID = rt
+                        .get(Role.REPRESENTATIVE);
+                else destinationID = rt.get(Role.LEFT_RT, 0);
+            }
+            else {
+                destinationID = rt.get(Role.LEFT_A_NODE);
+            }
+            // send(new Message(id, destinationID, data));
+        }
+        assert !keys.isEmpty() || !legacyKeys.isEmpty();
+        send(new Message(id, destinationID, data));
+    }
+
+    private void forwardManualKeyReplacementRequest(Message msg, RoutingTable rt) {
+        KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
         boolean newKeysAreComing = !data.getKeys().isEmpty();
         if (data.getDestinationPeer() == id) {
             assert newKeysAreComing;
             if (newKeysAreComing) {
-                this.legacyKeys = new ArrayList<Double>(keys);
-                this.keys = new ArrayList<Double>(data.getKeys());
+                this.legacyKeys = new TreeSet<Long>(keys);
+                this.keys = new TreeSet<Long>(data.getKeys());
             }
         }
         else if (newKeysAreComing) {
             msg.setDestinationId(data.getDestinationPeer());
-            net.sendMsg(msg);
+            send(msg);
         }
         else { // destination != id and new keys are not coming
             if (!this.keys.isEmpty() && !this.legacyKeys.isEmpty()) {
-                data.setKeys(new ArrayList<Double>(legacyKeys));
-                this.legacyKeys = new ArrayList<Double>();
+                data.setKeys(new TreeSet<Long>(legacyKeys));
+                this.legacyKeys = new TreeSet<Long>();
 
                 msg.setData(data);
                 msg.setDestinationId(data.getDestinationPeer());
-                net.sendMsg(msg);
+                send(msg);
             }
             else if (!this.keys.isEmpty()) {
-                this.legacyKeys = new ArrayList<Double>(this.keys);
-                this.keys = new ArrayList<Double>();
+                this.legacyKeys = new TreeSet<Long>(this.keys);
+                this.keys = new TreeSet<Long>();
 
-                data.setKeys(new ArrayList<Double>(legacyKeys));
+                data.setKeys(new TreeSet<Long>(legacyKeys));
                 msg.setData(data);
                 msg.setDestinationId(data.getDestinationPeer());
-                net.sendMsg(msg);
+                send(msg);
             }
         }
-
-        // if (!this.keys.isEmpty() && !this.legacyKeys.isEmpty()) {
-        // // node has replaced its normal keys with new ones. Legacy is a
-        // // shadow copy of the old ones because they haven't been requested
-        // // yet.
-        // if (!newKeysAreComing) {
-        // data.setKeys(legacyKeys);
-        // msg.setDestinationId(data.getDestinationPeer());
-        // net.sendMsg(msg);
-        // }
-        // else
-        // ;// DUNNO
-        // }
-        // else if (!this.legacyKeys.isEmpty()) {
-        // // node has given its data somewhere
-        // if (newKeysAreComing) {
-        // this.legacyKeys = new ArrayList<Double>();
-        // this.keys = new ArrayList<Double>(data.getKeys());
-        // }
-        // else {
-        // // there is legacy data but the message has no new keys
-        // }
-        // }
-        // else if (!this.keys.isEmpty()) {
-        // // this is normal, balanced behavior
-        // if (newKeysAreComing) {
-        // // message disrupts the peace
-        // if (data.getDestinationPeer() == id) {
-        // this.legacyKeys = new ArrayList<Double>(keys);
-        // this.keys = new ArrayList<Double>(data.getKeys());
-        // }
-        // else {
-        // msg.setDestinationId(data.getDestinationPeer());
-        // net.sendMsg(msg);
-        // }
-        // }
-        // else {
-        // if (data.getDestinationPeer() != id) {
-        // this.legacyKeys = new ArrayList<Double>(keys);
-        // msg.setDestinationId(data.getDestinationPeer());
-        // net.sendMsg(msg);
-        // }
-        // }
-        //
-        // }
     }
 
     private boolean keyIsInRange(double key) {
+        if (keys.isEmpty()) return false;
         double minRange = Collections.min(keys);
         double maxRange = Collections.max(keys);
         if (key < minRange) {
@@ -504,5 +628,15 @@ public class D2TreeIndexCore {
     private int log(int num, int base) {
         Double result = Math.log(num) / Math.log(base);
         return result.intValue();
+    }
+
+    void send(Message msg) {
+        assert msg.getDestinationId() != this.id;
+        assert msg.getDestinationId() != RoutingTable.DEF_VAL;
+        net.sendMsg(msg);
+    }
+
+    public void lookupResponse() {
+        decreasePendingQueries();
     }
 }

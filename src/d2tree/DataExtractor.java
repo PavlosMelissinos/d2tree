@@ -3,6 +3,7 @@ package d2tree;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.TreeSet;
 
 import d2tree.RoutingTable.Role;
 
@@ -24,12 +25,12 @@ public class DataExtractor {
         return bucketNodes;
     }
 
-    static LinkedHashMap<Long, ArrayList<Double>> getOrderedBucketNodes(
+    static LinkedHashMap<Long, TreeSet<Long>> getOrderedBucketNodes(
             LinkedHashMap<Long, RoutingTable> myRoutingTables, long bucketId) {
-        LinkedHashMap<Long, ArrayList<Double>> bucketNodes = new LinkedHashMap<Long, ArrayList<Double>>();
+        LinkedHashMap<Long, TreeSet<Long>> bucketNodes = new LinkedHashMap<Long, TreeSet<Long>>();
         RoutingTable leafRT = myRoutingTables.get(bucketId);
         Long bucketNodeId = leafRT.get(Role.FIRST_BUCKET_NODE);
-        LinkedHashMap<Long, ArrayList<Double>> keys = D2Tree.getAllKeys();
+        LinkedHashMap<Long, TreeSet<Long>> keys = D2Tree.getAllKeys();
 
         assert bucketNodeId != RoutingTable.DEF_VAL;
 
