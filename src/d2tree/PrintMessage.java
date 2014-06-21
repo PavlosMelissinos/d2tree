@@ -75,9 +75,9 @@ public class PrintMessage extends MessageBody {
             String logFile) {
         if (!PrintMessage.PRINTS_ENABLED) return;
         try {
-            if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
-                    !logFile.equals(PrintMessage.logDir + "conn-disconn.txt") &&
-                    !logFile.equals(PrintMessage.logDir + "messages.txt")) {
+            if (!logFile.equals("errors.txt") &&
+                    !logFile.equals("conn-disconn.txt") &&
+                    !logFile.equals("messages.txt")) {
                 // System.out.println(logFile.substring(logFile.lastIndexOf('/')));
                 System.out.println(logFile);
             }
@@ -101,7 +101,8 @@ public class PrintMessage extends MessageBody {
         if (!PrintMessage.PRINTS_ENABLED) return;
         try {
             if (!logFile.equals(PrintMessage.logDir + "errors.txt") &&
-                    stdOutFlag) {
+                    !logFile.equals(PrintMessage.logDir + "conn-disconn.txt") &&
+                    !logFile.equals(PrintMessage.logDir + "messages.txt")) {
                 System.out.println(logFile);
             }
             PrintWriter out = new PrintWriter(new FileWriter(logFile, true));

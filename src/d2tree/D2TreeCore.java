@@ -116,6 +116,10 @@ public class D2TreeCore {
         long newNodeId = msg.getSourceId();
 
         // assert !isBucketNode();
+        int minBucketNodes = (int) Math.pow(2, D2Tree.minHeight) - 1;
+        int minPBTNodes = (int) Math.pow(2, D2Tree.minHeight - 1);
+        assert msg.getSourceId() < minBucketNodes * D2Tree.minHeight +
+                minPBTNodes;
         if (isLeaf()) {
             if (mode == Mode.REDISTRIBUTION || mode == Mode.TRANSFER) {
                 printText = "Bucket is busy. Resending message to a neighbor.";
@@ -2008,6 +2012,13 @@ public class D2TreeCore {
 
     RoutingTable getRT() {
         return this.rt;
+    }
+
+    // void setRT(Role role, int index, long value) {}
+
+    void setRT(RoutingTable rt) {
+        this.rt = rt;
+        D2TreeCore.routingTables.put(id, rt);
     }
 
     long getID() {

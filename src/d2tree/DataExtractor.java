@@ -32,6 +32,9 @@ public class DataExtractor {
         Long bucketNodeId = leafRT.get(Role.FIRST_BUCKET_NODE);
         LinkedHashMap<Long, TreeSet<Long>> keys = D2Tree.getAllKeys();
 
+        // if (bucketNodeId == RoutingTable.DEF_VAL){
+        // System.out.println();
+        // }
         assert bucketNodeId != RoutingTable.DEF_VAL;
 
         bucketNodes.put(bucketNodeId, keys.get(bucketNodeId));

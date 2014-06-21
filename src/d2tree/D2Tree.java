@@ -1,5 +1,6 @@
 package d2tree;
 
+import java.io.IOException;
 import java.lang.Thread.State;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,12 +32,14 @@ public class D2Tree extends Peer {
     private static ArrayList<Integer>    introducers;
     private static HashMap<Long, D2Tree> allNodes;
 
-    private static int                   minHeight = 0;
+    final static int                     minHeight = 5;
 
-    // private static ArrayList<>
+    private static TreeSet<Long>         initialKeys;
+    private static ArrayList<Long>       adjacencies;
 
     private int getRandomIntroducer() {
         randomGenerator = new Random();
+        if (introducers.isEmpty()) return (int) RoutingTable.DEF_VAL;
         int index = randomGenerator.nextInt(D2Tree.introducers.size());
         return D2Tree.introducers.get(index);
     }
@@ -56,7 +59,7 @@ public class D2Tree extends Peer {
 
         if (D2Tree.introducers == null)
             D2Tree.introducers = new ArrayList<Integer>();
-        if (D2Tree.introducers.isEmpty()) D2Tree.introducers.add(1);
+        // if (D2Tree.introducers.isEmpty()) D2Tree.introducers.add(1);
 
         if (allNodes == null) allNodes = new HashMap<Long, D2Tree>();
         allNodes.put(Id, this);
@@ -64,22 +67,46 @@ public class D2Tree extends Peer {
         int minPBTNodes = (int) Math.pow(2, minHeight) - 1;
         int minLeaves = (int) Math.pow(2, minHeight - 1);
         if (id <= minPBTNodes) {
-            // we initialize the first 63 nodes for the tree structure
-            initializePBT();
             isOnline = true;
+            if (adjacencies == null) {
+                adjacencies = new ArrayList<Long>();
+                adjacencies.add(Id);
+            }
+            // we initialize some nodes for the tree structure (2^h - 1)
+            initializePBT(minPBTNodes);
+            if (id == minPBTNodes) {
+
+                PrintMessage data = new PrintMessage(D2TreeMessageT.JOIN_REQ,
+                        id);
+                LinkedHashMap<Long, RoutingTable> RTs = new LinkedHashMap<Long, RoutingTable>(
+                        D2TreeCore.routingTables);
+                try {
+                    PrintMessage.printPBT(new Message(id, id, data), RTs,
+                            "tree.txt");
+                }
+                catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                System.out.println("PBT Initialization completed");
+            }
             return;
         }
-        else if (id < minLeaves * minHeight + minPBTNodes) {
+        else if (id <= minLeaves * minHeight + minPBTNodes) {
             // the rest 192 (32 * 6) get into the buckets of the 32 resulting
             // leaves, 6 in each bucket
-            initializeBuckets();
+            initializeBuckets(minPBTNodes, minLeaves);
             isOnline = true;
+            if (Id == minPBTNodes + minLeaves * minHeight) {
+                System.out.println("Bucket initialization complete.");
+                PrintMessage data = new PrintMessage(D2TreeMessageT.JOIN_REQ,
+                        Id);
+                if (D2Tree.introducers.isEmpty()) D2Tree.introducers.add(1);
+                // PrintMessage.printTreeByIndex(allNodes, msg, logFile);
+                Core.printTree(new Message(id, id, data));
+            }
             return;
         }
-        // this.redistCore = new D2TreeRedistributionCore(Id, Net);
-        // this.introducer = 1;
-
-        if (id == 1) isOnline = true;
     }
 
     @Override
@@ -100,9 +127,13 @@ public class D2Tree extends Peer {
         PrintMessage.print(msg, "Node " + msg.getDestinationId() +
                 " received message from " + msg.getSourceId(), "messages.txt");
         mType = msg.getType();
-
+        // if (!isOnline && Id < 2 * D2Tree.minHeight - 1) return;
         switch (mType) {
         case D2TreeMessageT.JOIN_REQ:
+            if (msg.getSourceId() < D2Tree.minHeight * D2Tree.minHeight - 1) {
+                isOnline = true;
+                break;
+            }
             if (Core.isLeaf()) {
                 RoutingTable coreRT = Core.getRT();
                 long precedingNode = coreRT.contains(Role.LAST_BUCKET_NODE) ? coreRT
@@ -120,8 +151,10 @@ public class D2Tree extends Peer {
             Core.forwardJoinRequest(msg);
             break;
         case D2TreeMessageT.JOIN_RES:
-            Core.forwardJoinResponse(msg);
-            isOnline = true;
+            if (isOnline || Id >= D2Tree.minHeight * D2Tree.minHeight - 1) {
+                Core.forwardJoinResponse(msg);
+                isOnline = true;
+            }
             break;
         case D2TreeMessageT.LEAVE_REQ:
             this.forwardLeaveRequest(msg);
@@ -205,7 +238,8 @@ public class D2Tree extends Peer {
                     indexCore.legacyKeys = new TreeSet<Long>(indexCore.keys);
                     indexCore.keys.clear();
                     send(new Message(Id, destBucket, keyRepData));
-                    // indexCore.forwardKeyReplacementRequest(new Message(Id,
+                    // indexCore.forwardKeyReplacementRequest(new
+                    // Message(Id,
                     // destBucket, keyRepData), Core.getRT());
                 }
                 else if (newRepresentative == destBucket) {
@@ -216,7 +250,8 @@ public class D2Tree extends Peer {
                     indexCore.keys.clear();
 
                     send(new Message(Id, pivotBucket, keyRepData));
-                    // indexCore.forwardKeyReplacementRequest(new Message(Id,
+                    // indexCore.forwardKeyReplacementRequest(new
+                    // Message(Id,
                     // pivotBucket, keyRepData), Core.getRT());
                 }
                 else assert false;
@@ -289,6 +324,11 @@ public class D2Tree extends Peer {
 
         Message msg;
 
+        int minPBTNodes = (int) Math.pow(2, minHeight) - 1;
+        int minLeaves = (int) Math.pow(2, minHeight - 1);
+
+        long nodeTotal = minPBTNodes + minLeaves * minHeight;
+        if (Id < nodeTotal) return;
         // introducers.add((int) this.Id);
         // msg = new Message(Id, introducer, new JoinRequest());
         msg = new Message(Id, getRandomIntroducer(), new JoinRequest());
@@ -596,11 +636,174 @@ public class D2Tree extends Peer {
         Net.sendMsg(msg);
     }
 
-    void initializePBT() {
+    void initializePBT(long minPBTNodes) {
+        // if (Id == 1) return;
+        Message mmm = new Message(Id, Id, new PrintMessage(
+                D2TreeMessageT.JOIN_REQ, Id));
+        PrintMessage.print(mmm, "initializing node " + Id, "connect.txt");
 
+        System.out.println("initializing node " + Id);
+
+        RoutingTable rt = new RoutingTable(Id);
+        int nodeIndex = adjacencies.indexOf(Id);
+
+        /*
+         * set parent
+         */
+        if (Id != 1) rt.set(Role.PARENT, Math.floorDiv(Id, 2));
+
+        if (Id * 2 <= minPBTNodes) {
+            /*
+             * set children
+             */
+            long lChild = Id * 2;
+            rt.set(Role.LEFT_CHILD, lChild);
+
+            long rChild = lChild + 1;
+            rt.set(Role.RIGHT_CHILD, rChild);
+
+            if (!D2Tree.adjacencies.contains(lChild))
+                D2Tree.adjacencies.add(nodeIndex, lChild);
+            nodeIndex = adjacencies.indexOf(Id);
+            if (!D2Tree.adjacencies.contains(rChild))
+                D2Tree.adjacencies.add(nodeIndex + 1, rChild);
+
+            nodeIndex = adjacencies.indexOf(Id);
+        }
+
+        /*
+         * set left adjacent
+         */
+        long lAdj = findLAdj(minPBTNodes);
+        if (lAdj != RoutingTable.DEF_VAL) {
+            rt.set(Role.LEFT_A_NODE, lAdj);
+            if (!D2Tree.adjacencies.contains(lAdj))
+                D2Tree.adjacencies.add(nodeIndex, lAdj);
+        }
+
+        nodeIndex = adjacencies.indexOf(Id);
+        /*
+         * set right adjacent
+         */
+        long rAdj = findRAdj(minPBTNodes, lAdj);
+        if (rAdj != RoutingTable.DEF_VAL) {
+            rt.set(Role.RIGHT_A_NODE, rAdj);
+            if (!D2Tree.adjacencies.contains(rAdj))
+                D2Tree.adjacencies.add(nodeIndex + 1, rAdj);
+        }
+
+        /*
+         * set leftRT
+         */
+
+        long leftmostNodeLevel = Integer.highestOneBit((int) Id);
+        for (int i = 0;; i++) {
+            int j = (int) Math.pow(2, i);
+
+            if (Id - j < leftmostNodeLevel) break;
+            rt.set(Role.LEFT_RT, i, Id - j);
+        }
+
+        /*
+         * set rightRT
+         */
+        long rightmostNodeLevel = leftmostNodeLevel * 2 - 1;
+        for (int i = 0;; i++) {
+            int j = (int) Math.pow(2, i);
+
+            if (Id + j > rightmostNodeLevel) break;
+            rt.set(Role.RIGHT_RT, i, Id + j);
+        }
+
+        long leftmostLeaf = (minPBTNodes + 1) / 2;
+        if (Id >= leftmostLeaf) {
+            int bucketSize = D2Tree.minHeight;
+            long bucketIndex = Id - leftmostLeaf;
+            /*
+             * set first bucket node
+             */
+            long firstBucketNode = minPBTNodes + 1 + bucketIndex * bucketSize;
+            rt.set(Role.FIRST_BUCKET_NODE, firstBucketNode);
+
+            /*
+             * set last bucket node
+             */
+            long lastBucketNode = firstBucketNode + bucketSize - 1;
+            rt.set(Role.LAST_BUCKET_NODE, lastBucketNode);
+        }
+
+        // if (Id != 1)
+        Core.setRT(rt);
     }
 
-    void initializeBuckets() {
+    private long findLAdj(long minPBTNodes) {
+        // int lastLevel = Integer.highestOneBit((int)minPBTNodes);
 
+        long leftmostLeaf = (minPBTNodes + 1) / 2;
+        long lAdj = RoutingTable.DEF_VAL;
+
+        if (Id > leftmostLeaf) {
+            // this is a leaf and left adjacent is an inner node
+            // left adjacent
+
+            // long leafIndex = Id - leftmostLeaf;
+            // lAdj = adjacencies.get(2 * (int) leafIndex - 1);
+
+            int index = adjacencies.indexOf(Id);
+            if (index != 0) {
+                assert index > 0;
+                lAdj = adjacencies.get(index - 1);
+            }
+        }
+        else if (Id < leftmostLeaf) {
+            // this is an inner node and left adjacent is a leaf
+            lAdj = 2 * Id; // begin with the left child
+            while (lAdj < leftmostLeaf) {
+                lAdj = 2 * lAdj + 1;
+            }
+        }
+
+        return lAdj;
+    }
+
+    private long findRAdj(long minPBTNodes, long lAdj) {
+        long rightmostLeaf = minPBTNodes;
+        long rAdj = RoutingTable.DEF_VAL;
+        if (lAdj > Id) {
+            rAdj = lAdj + 1;
+        }
+        else if (Id < rightmostLeaf) {
+            rAdj = adjacencies.get(adjacencies.indexOf(Id) + 1);
+        }
+        return rAdj;
+    }
+
+    void initializeBuckets(long minPBTNodes, long minBucketNodes) {
+        RoutingTable rt = new RoutingTable(Id);
+
+        long leftmostLeaf = (minPBTNodes + 1) / 2;
+        long bucketSize = D2Tree.minHeight;
+
+        System.out.println("initializing bucket node " + Id);
+        /*
+         * set left rt
+         */
+        long leftmostBucketNode = minPBTNodes + 1;
+        long bucketIndex = (Id - leftmostBucketNode) / bucketSize;
+        if (Id > leftmostBucketNode) rt.set(Role.LEFT_RT, 0, Id - 1);
+
+        /*
+         * set right rt
+         */
+        long rightmostBucketNode = leftmostBucketNode + minBucketNodes;
+        if (Id < rightmostBucketNode) rt.set(Role.RIGHT_RT, 0, Id + 1);
+
+        /*
+         * set representative
+         */
+        long repr = leftmostLeaf + bucketIndex;
+        rt.set(Role.REPRESENTATIVE, repr);
+
+        Core.setRT(rt);
     }
 }

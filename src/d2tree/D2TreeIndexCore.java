@@ -68,8 +68,8 @@ public class D2TreeIndexCore {
     }
 
     void lookup(Message msg, RoutingTable coreRT) {
-        // // uncomment to force code not to work, comment to work it
-        // if (msg != null) return;
+        // uncomment to force code not to work, comment to work it
+        if (msg != null) return;
 
         LookupRequest data = (LookupRequest) msg.getData();
         long key = data.getKey();

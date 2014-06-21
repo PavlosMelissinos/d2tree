@@ -104,7 +104,7 @@ public class RoutingTable implements Serializable {
             set(role, value);
             return;
         }
-        updateInconsistencies(role, index, oldValue);
+        // updateInconsistencies(role, index, oldValue);
         String printText = id + "." + role + "=" + value + "(replaced " +
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
@@ -120,7 +120,7 @@ public class RoutingTable implements Serializable {
             throw new IllegalArgumentException();
         }
         else this.visiblePeers.put(role, value);
-        updateInconsistencies(role, 0, oldValue);
+        // updateInconsistencies(role, 0, oldValue);
         String printText = id + "." + role + "=" + value + "(replaced " +
                 oldValue + ")";
         PrintMessage data = new PrintMessage(D2TreeMessageT.CONNECT_MSG, id);
@@ -134,13 +134,13 @@ public class RoutingTable implements Serializable {
         case LEFT_RT:
             if (leftRT.size() > index && leftRT.get(index) == oldValue) {
                 leftRT.remove(index);
-                updateInconsistencies(role, index, oldValue);
+                // updateInconsistencies(role, index, oldValue);
             }
             break;
         case RIGHT_RT:
             if (rightRT.size() > index && rightRT.get(index) == oldValue) {
                 rightRT.remove(index);
-                updateInconsistencies(role, index, oldValue);
+                // updateInconsistencies(role, index, oldValue);
             }
             break;
         default:
@@ -372,7 +372,7 @@ public class RoutingTable implements Serializable {
                 if (PrintMessage.PRINTS_ENABLED) {
                     PrintWriter out = new PrintWriter(new FileWriter(
                             PrintMessage.logDir + "isLeaf.log", true));
-                    new RuntimeException().printStackTrace(out);
+                    // new RuntimeException().printStackTrace(out);
                     out.print("ID = " + id + ", ");
                     print(out);
                     out.close();
