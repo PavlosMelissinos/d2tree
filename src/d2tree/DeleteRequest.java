@@ -5,6 +5,8 @@
 
 package d2tree;
 
+import p2p.simulator.message.MessageT;
+
 /**
  * 
  * @author Pavlos Melissinos
@@ -22,6 +24,6 @@ public class DeleteRequest extends LookupRequest {
 
     @Override
     public int getType() {
-        return D2TreeMessageT.DELETE_REQ;
+        return MessageT.DELETE_REQ;
     }
 }

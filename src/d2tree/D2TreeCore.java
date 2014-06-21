@@ -116,10 +116,10 @@ public class D2TreeCore {
         long newNodeId = msg.getSourceId();
 
         // assert !isBucketNode();
-        int minBucketNodes = (int) Math.pow(2, D2Tree.minHeight) - 1;
-        int minPBTNodes = (int) Math.pow(2, D2Tree.minHeight - 1);
-        assert msg.getSourceId() < minBucketNodes * D2Tree.minHeight +
-                minPBTNodes;
+        int minPBTNodes = (int) Math.pow(2, D2Tree.minHeight) - 1;
+        int minLeaves = (int) Math.pow(2, D2Tree.minHeight - 1);
+        int minBucketNodes = minLeaves * D2Tree.minHeight;
+        assert msg.getSourceId() > minBucketNodes + minPBTNodes;
         if (isLeaf()) {
             if (mode == Mode.REDISTRIBUTION || mode == Mode.TRANSFER) {
                 printText = "Bucket is busy. Resending message to a neighbor.";
@@ -999,10 +999,10 @@ public class D2TreeCore {
                 // assert rt.get(Role.FIRST_BUCKET_NODE) == msg.getSourceId();
             }
             else {
-                assert destBucket == null;
-                if (destBucket == null) {
-
-                }
+                // assert destBucket == null;
+                // if (destBucket == null) {
+                //
+                // }
             }
         }
         else throw new UnsupportedOperationException();

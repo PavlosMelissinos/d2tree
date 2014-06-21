@@ -3,6 +3,7 @@ package d2tree;
 import java.util.LinkedList;
 
 import p2p.simulator.message.MessageBody;
+import p2p.simulator.message.MessageT;
 
 /*
  * To change this template, choose Tools | Templates and open the template in
@@ -173,7 +174,7 @@ public class LookupRequest extends MessageBody {
 
     @Override
     public int getType() {
-        return D2TreeMessageT.LOOKUP_REQ;
+        return MessageT.LOOKUP_REQ;
     }
 
 }

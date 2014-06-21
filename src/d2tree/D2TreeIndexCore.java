@@ -33,14 +33,16 @@ public class D2TreeIndexCore {
     TreeSet<Long>       legacyKeys;
     private long        legacyHost;
 
-    static long         MIN_VALUE    = -1000000;    // -Long.MAX_VALUE;
-    static long         MAX_VALUE    = 1000000;     // Long.MAX_VALUE;
+    // static long MIN_VALUE = -1000000; // -Long.MAX_VALUE;
+    // static long MAX_VALUE = 1000000; // Long.MAX_VALUE;
+    static long         MIN_VALUE    = -Long.MAX_VALUE;
+    static long         MAX_VALUE    = Long.MAX_VALUE;
 
     D2TreeIndexCore(long id, Network network) {
         this.net = network;
         this.id = id;
         keys = new TreeSet<Long>();
-        if (id == 1) keys.add(0L);
+        // if (id == 1) keys.add(0L);
         legacyKeys = new TreeSet<Long>();
         // legacyKeys.add();
         this.pendingQueries = 0;
@@ -68,8 +70,8 @@ public class D2TreeIndexCore {
     }
 
     void lookup(Message msg, RoutingTable coreRT) {
-        // uncomment to force code not to work, comment to work it
-        if (msg != null) return;
+        // // uncomment to force code not to work, comment to work it
+        // if (msg != null) return;
 
         LookupRequest data = (LookupRequest) msg.getData();
         long key = data.getKey();
@@ -623,11 +625,6 @@ public class D2TreeIndexCore {
 
     int getPendingQueries() {
         return this.pendingQueries;
-    }
-
-    private int log(int num, int base) {
-        Double result = Math.log(num) / Math.log(base);
-        return result.intValue();
     }
 
     void send(Message msg) {
