@@ -33,13 +33,13 @@ public class D2Tree extends Peer {
     private static ArrayList<Integer>    introducers;
     private static HashMap<Long, D2Tree> allNodes;
 
-    final static int                     minHeight = 5;
+    final static int                     minHeight = 6;
 
     private static ArrayList<Long>       initialKeys;
     private static ArrayList<Long>       adjacencies;
 
-    private long                         n;
-    private long                         k;
+    private long                         n;              // nodes
+    private long                         k;              // keyspace
 
     private int getRandomIntroducer() {
         randomGenerator = new Random();

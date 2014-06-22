@@ -12,6 +12,7 @@ import p2p.simulator.message.MessageT;
 import p2p.simulator.network.Network;
 import d2tree.KeyReplacementRequest.Mode;
 import d2tree.LookupRequest.KeyPosition;
+import d2tree.LookupRequest.Locality;
 import d2tree.LookupRequest.LookupMode;
 import d2tree.LookupRequest.LookupPhase;
 import d2tree.RoutingTable.Role;
@@ -85,98 +86,7 @@ public class D2TreeIndexCore {
             resolveSubrequest(msg);
         }
         else if (data.getLookupMode() == LookupMode.VIA_LEAVES) {
-            KeyPosition pos = KeyPosition.GREATER;
-            if (!keys.isEmpty()) {
-                pos = KeyPosition.getPosition(key, Collections.min(keys),
-                        Collections.max(keys));
-            }
-            else if (coreRT.isEmpty(Role.RIGHT_RT)) {
-                pos = KeyPosition.LESS;
-            }
-
-            if (!coreRT.isLeaf() && !coreRT.isBucketNode()) {
-                if (pos == KeyPosition.GREATER) targetNodeId = coreRT
-                        .get(Role.RIGHT_A_NODE);
-                else targetNodeId = coreRT.get(Role.LEFT_A_NODE);
-
-                msg.setDestinationId(targetNodeId);
-                data.setKeyPosition(pos);
-                msg.setData(data);
-                send(msg);
-            }
-            else if (coreRT.isLeaf()) {
-                int keyDistance = data.getKeyRTDistance();
-                Role role = null;
-                assert pos == KeyPosition.GREATER || pos == KeyPosition.LESS;
-                if (pos == KeyPosition.GREATER) role = Role.RIGHT_RT;
-                else role = Role.LEFT_RT;
-
-                if (keyDistance < 0) keyDistance = coreRT.size(role) + 1;
-
-                if (keyDistance > 1) {
-                    keyDistance--;
-                    targetNodeId = coreRT.get(role, keyDistance - 1);
-                    System.out.println("KEY DISTANCE: " + keyDistance + " vs " +
-                            role + " Size: " + coreRT.size(role) + " for RT: " +
-                            coreRT);
-                    assert keyDistance <= coreRT.size(role);
-                    assert keyDistance >= 1;
-                    assert targetNodeId != RoutingTable.DEF_VAL;
-                }
-                else {
-                    assert keyDistance == 1;
-                    if (pos == KeyPosition.GREATER) {
-                        targetNodeId = coreRT.get(Role.LAST_BUCKET_NODE);
-                        data.addToQueue(coreRT.get(Role.RIGHT_A_NODE));
-                        data.addToQueue(coreRT.get(Role.RIGHT_RT, 0));
-                        assert targetNodeId != RoutingTable.DEF_VAL;
-                    }
-                    else {
-                        assert pos == KeyPosition.LESS;
-                        if (coreRT.isEmpty(Role.LEFT_RT)) {
-                            resolveSubrequest(msg);
-                            return;
-                        }
-                        targetNodeId = coreRT.get(Role.LEFT_RT, 0);
-                        assert targetNodeId != RoutingTable.DEF_VAL;
-                    }
-                    assert targetNodeId != RoutingTable.DEF_VAL;
-                }
-
-                msg.setDestinationId(targetNodeId);
-                data.setKeyPosition(pos);
-                data.setKeyRTDistance(keyDistance);
-                msg.setData(data);
-                send(msg);
-            }
-            else {
-                assert coreRT.isBucketNode();
-                if (pos == KeyPosition.LESS) {
-                    if (coreRT.isEmpty(Role.LEFT_RT)) {
-                        targetNodeId = id;
-                        // msg.setDestinationId(targetNodeId);
-                        resolveSubrequest(msg);
-                        return;
-                    }
-                    else {
-                        targetNodeId = coreRT.get(Role.LEFT_RT, 0);
-                    }
-                }
-                else if (pos == KeyPosition.GREATER) {
-                    if (coreRT.isEmpty(Role.RIGHT_RT)) {
-                        targetNodeId = data.getNextInQueue();
-
-                        msg.setDestinationId(targetNodeId);
-                        data.setKeyPosition(pos);
-                        msg.setData(data);
-                        send(msg);
-                    }
-                    else {
-                        resolveSubrequest(msg);
-                        return;
-                    }
-                }
-            }
+            lookupViaLeaves(msg, key, coreRT);
         }
         else {
             slowLookup(msg, key, targetNodeId);
@@ -258,12 +168,12 @@ public class D2TreeIndexCore {
         this.keys.add(value);
     }
 
-    boolean directionHasChanged(long key, KeyPosition pos) {
+    boolean directionHasChanged(long key, KeyPosition oldPos) {
         if (keys.isEmpty()) return false;
         long minRange = Collections.min(keys);
         long maxRange = Collections.max(keys);
         KeyPosition newPos = KeyPosition.getPosition(key, minRange, maxRange);
-        return newPos != pos;
+        return newPos != oldPos;
     }
 
     // initially KeyPosition is NEITHER, lookup phase is FIRST
@@ -390,28 +300,251 @@ public class D2TreeIndexCore {
         }
     }
 
-    long nextLookupTargetOnlyLeaves(double key, RoutingTable rt, int rtDistance) {
-        double minRange = Collections.min(keys);
-        double maxRange = Collections.max(keys);
-        Role role;
-        if (key < minRange) {
-            role = Role.LEFT_RT;
-        }
-        else if (key > maxRange) {
-            role = Role.RIGHT_RT;
-        }
-        else return id;
+    void lookupViaLeaves(Message msg, long key, RoutingTable coreRT) {
+        LookupRequest data = (LookupRequest) msg.getData();
+        KeyPosition newPos = KeyPosition.getPosition(key,
+                Collections.min(keys), Collections.max(keys));
 
-        if (rtDistance < 0) {
-            rtDistance = rt.size(role);
+        long targetNodeId = RoutingTable.DEF_VAL;
+        if (data.getLocality() == Locality.UNDEFINED) {
+            data.enhanceLocality();
+            if (coreRT.isLeaf()) {
+                lookupViaLeaves(msg, key, coreRT);
+                return;
+            }
+            else if (coreRT.isBucketNode()) {
+                msg.setDestinationId(coreRT.get(Role.REPRESENTATIVE));
+            }
+            else {
+                if (newPos == KeyPosition.GREATER) {
+                    msg.setDestinationId(coreRT.get(Role.RIGHT_A_NODE));
+                }
+                else if (newPos == KeyPosition.LESS) {
+                    msg.setDestinationId(coreRT.get(Role.LEFT_A_NODE));
+                }
+            }
+            send(msg);
         }
-        else if (rtDistance < 0) {
-            rtDistance--;
-        }
+        else if (data.getLocality() == Locality.LEAVES) {
+            assert coreRT.isLeaf();
+            int keyDistance = data.getKeyRTDistance();
 
-        long nextLookupTargetID = rt.get(role, rtDistance);
-        return nextLookupTargetID;
+            Role role = Role.RIGHT_RT;
+            if (newPos == KeyPosition.LESS) {
+                role = Role.LEFT_RT;
+                if (coreRT.isEmpty(role)) resolveSubrequest(msg);
+            }
+            if (keyDistance < 0) {
+                keyDistance = coreRT.size(role) + 1;
+            }
+            keyDistance--;
+
+            if (keyDistance <= 1) data.enhanceLocality();
+
+            if (keyDistance == 1) {
+                if (role == Role.RIGHT_RT) {
+                    targetNodeId = coreRT.get(role, 0);
+                    data.setKeyPosition(KeyPosition.LESS);
+                    data.addToQueue(coreRT.get(Role.RIGHT_A_NODE));
+                    data.addToQueue(coreRT.get(Role.LAST_BUCKET_NODE));
+                    assert targetNodeId > 0;
+                }
+                else {
+                    assert role == Role.LEFT_RT;
+                    data.setKeyPosition(KeyPosition.GREATER);
+                    targetNodeId = coreRT.get(role, 0);
+                    data.addToQueue(coreRT.get(Role.LEFT_A_NODE));
+                    assert targetNodeId > 0;
+                }
+            }
+            else if (keyDistance < 1) {
+                assert coreRT.isEmpty(role);
+                assert role == Role.RIGHT_RT;
+                targetNodeId = coreRT.get(Role.FIRST_BUCKET_NODE);
+                assert targetNodeId > 0;
+            }
+            else {
+                targetNodeId = coreRT.get(role, (int) keyDistance - 1);
+                assert targetNodeId > 0;
+            }
+
+            data.setKeyRTDistance(keyDistance);
+            msg.setDestinationId(targetNodeId);
+            send(msg);
+        }
+        else if (data.getLocality() == Locality.IMMEDIATE_AREA) {
+            if (directionHasChanged(key, data.getKeyPosition())) {
+                resolveSubrequest(msg);
+                return;
+            }
+            else if (coreRT.isBucketNode()) {
+                if (newPos == KeyPosition.LESS) {
+                    if (coreRT.isEmpty(Role.LEFT_RT)) {
+                        resolveSubrequest(msg);
+                        return;
+                    }
+                    else targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+                }
+                else if (newPos == KeyPosition.GREATER) {
+                    if (coreRT.isEmpty(Role.RIGHT_RT)) {
+                        targetNodeId = data.getNextInQueue();
+                    }
+                    else {
+                        targetNodeId = coreRT.get(Role.RIGHT_RT, 0);
+                    }
+                }
+            }
+            else if (coreRT.isLeaf()) {
+                if (data.getKeyPosition() == KeyPosition.GREATER)
+                    data.addToQueue(coreRT.get(Role.LAST_BUCKET_NODE));
+                targetNodeId = data.getNextInQueue();
+            }
+            else {
+                targetNodeId = data.getNextInQueue();
+            }
+            msg.setDestinationId(targetNodeId);
+            send(msg);
+        }
+        else {
+            assert data.getLocality() == Locality.EXACT;
+            resolveSubrequest(msg);
+        }
     }
+
+    void lookupViaLeavesMessy(Message msg, long key, long targetNodeId,
+            RoutingTable coreRT) {
+        LookupRequest data = (LookupRequest) msg.getData();
+
+        KeyPosition pos = KeyPosition.GREATER;
+        if (!keys.isEmpty()) {
+            pos = KeyPosition.getPosition(key, Collections.min(keys),
+                    Collections.max(keys));
+        }
+        else if (coreRT.isEmpty(Role.RIGHT_RT)) {
+            pos = KeyPosition.LESS;
+        }
+
+        if (!coreRT.isLeaf() && !coreRT.isBucketNode()) {
+            if (pos == KeyPosition.GREATER) targetNodeId = coreRT
+                    .get(Role.RIGHT_A_NODE);
+            else targetNodeId = coreRT.get(Role.LEFT_A_NODE);
+
+            msg.setDestinationId(targetNodeId);
+            data.setKeyPosition(pos);
+            msg.setData(data);
+            send(msg);
+        }
+        else if (coreRT.isLeaf()) {
+            int keyDistance = data.getKeyRTDistance();
+            Role role = null;
+            assert pos == KeyPosition.GREATER || pos == KeyPosition.LESS;
+            if (pos == KeyPosition.GREATER) role = Role.RIGHT_RT;
+            else role = Role.LEFT_RT;
+
+            if (keyDistance < 0) keyDistance = coreRT.size(role) + 1;
+
+            if (keyDistance > 1) {
+                keyDistance--;
+                targetNodeId = coreRT.get(role, keyDistance - 1);
+                System.out.println("KEY DISTANCE: " + keyDistance + " vs " +
+                        role + " Size: " + coreRT.size(role) + " for RT: " +
+                        coreRT);
+                assert keyDistance <= coreRT.size(role);
+                assert keyDistance >= 1;
+                assert targetNodeId != RoutingTable.DEF_VAL;
+            }
+            else {
+                assert keyDistance == 1;
+                if (pos == KeyPosition.GREATER) {
+                    targetNodeId = coreRT.get(Role.LAST_BUCKET_NODE);
+                    data.addToQueue(coreRT.get(Role.RIGHT_A_NODE));
+                    data.addToQueue(coreRT.get(Role.RIGHT_RT, 0));
+                    assert targetNodeId != RoutingTable.DEF_VAL;
+                }
+                else {
+                    assert pos == KeyPosition.LESS;
+                    if (coreRT.isEmpty(Role.LEFT_RT)) {
+                        resolveSubrequest(msg);
+                        return;
+                    }
+                    targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+                    assert targetNodeId != RoutingTable.DEF_VAL;
+                }
+                assert targetNodeId != RoutingTable.DEF_VAL;
+            }
+
+            msg.setDestinationId(targetNodeId);
+            data.setKeyPosition(pos);
+            data.setKeyRTDistance(keyDistance);
+            msg.setData(data);
+            send(msg);
+        }
+        else {
+            assert coreRT.isBucketNode();
+            int keyDistance = data.getKeyRTDistance();
+            if (keyDistance < 0) {
+                msg.setDestinationId(coreRT.get(Role.REPRESENTATIVE));
+                data.setKeyPosition(pos);
+                msg.setData(data);
+                send(msg);
+                return;
+            }
+            else if (pos == KeyPosition.LESS) {
+                if (coreRT.isEmpty(Role.LEFT_RT)) {
+                    targetNodeId = id;
+                    // msg.setDestinationId(targetNodeId);
+                    resolveSubrequest(msg);
+                    return;
+                }
+                else {
+                    targetNodeId = coreRT.get(Role.LEFT_RT, 0);
+
+                    msg.setDestinationId(targetNodeId);
+                    data.setKeyPosition(pos);
+                    msg.setData(data);
+                    send(msg);
+                }
+            }
+            else if (pos == KeyPosition.GREATER) {
+                if (coreRT.isEmpty(Role.RIGHT_RT)) {
+                    targetNodeId = data.getNextInQueue();
+
+                    msg.setDestinationId(targetNodeId);
+                    data.setKeyPosition(pos);
+                    msg.setData(data);
+                    send(msg);
+                }
+                else {
+                    resolveSubrequest(msg);
+                    return;
+                }
+            }
+        }
+    }
+
+    // long nextLookupTargetOnlyLeaves(double key, RoutingTable rt, int
+    // rtDistance) {
+    // double minRange = Collections.min(keys);
+    // double maxRange = Collections.max(keys);
+    // Role role;
+    // if (key < minRange) {
+    // role = Role.LEFT_RT;
+    // }
+    // else if (key > maxRange) {
+    // role = Role.RIGHT_RT;
+    // }
+    // else return id;
+    //
+    // if (rtDistance < 0) {
+    // rtDistance = rt.size(role);
+    // }
+    // else if (rtDistance < 0) {
+    // rtDistance--;
+    // }
+    //
+    // long nextLookupTargetID = rt.get(role, rtDistance);
+    // return nextLookupTargetID;
+    // }
 
     void forwardKeyReplacementRequest(Message msg, RoutingTable rt) {
         KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
@@ -427,16 +560,12 @@ public class D2TreeIndexCore {
     private void forwardInorderKeyReplacementRequest(Message msg,
             RoutingTable rt) {
         KeyReplacementRequest data = (KeyReplacementRequest) msg.getData();
-        // ArrayList<Long> tempKeys;
         long destinationID = msg.getDestinationId();
-        // tempKeys = new ArrayList<Long>(this.keys);
         TreeSet<Long> movingKeys;
         TreeSet<Long> stayingKeys;
 
         assert !data.getKeys().isEmpty();
-        // assert !keys.isEmpty() || !legacyKeys.isEmpty();
         if (data.getDestinationPeer() == id) {
-            // assert keys.isEmpty();
             this.keys.addAll(new TreeSet<Long>(data.getKeys()));
             this.legacyKeys.clear();
             return;
@@ -447,9 +576,6 @@ public class D2TreeIndexCore {
             stayingKeys = new TreeSet<Long>();
         }
         else if (data.getMode() == Mode.INORDER) {
-            // assert this.keys.get(0) > data.getKeys().get(0);
-            // TreeSet<Long> allKeys = new TreeSet<Long>(data.getKeys());
-            // allKeys.addAll(this.keys);
             ArrayList<Long> allKeys = new ArrayList<Long>(data.getKeys());
             allKeys.addAll(this.keys);
             Collections.sort(allKeys);
@@ -464,7 +590,6 @@ public class D2TreeIndexCore {
         }
         else {
             assert data.getMode() == Mode.REVERSE_INORDER;
-            // assert this.keys.get(0) < data.getKeys().get(0);
             ArrayList<Long> allKeys = new ArrayList<Long>(data.getKeys());
             allKeys.addAll(this.keys);
             Collections.sort(allKeys);
@@ -540,7 +665,6 @@ public class D2TreeIndexCore {
             else {
                 destinationID = rt.get(Role.LEFT_A_NODE);
             }
-            // send(new Message(id, destinationID, data));
         }
         assert !keys.isEmpty() || !legacyKeys.isEmpty();
         send(new Message(id, destinationID, data));

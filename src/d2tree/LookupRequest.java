@@ -18,6 +18,7 @@ public class LookupRequest extends MessageBody {
     private LookupMode        mode;
     private int               keyRTDistance;
     private LinkedList<Long>  queue;
+    private Locality          locality;
 
     // private Bound lowerBound;
     // private Bound upperBound;
@@ -40,6 +41,13 @@ public class LookupRequest extends MessageBody {
     // }
     // }
 
+    enum Locality {
+        UNDEFINED,
+        LEAVES,
+        IMMEDIATE_AREA,
+        EXACT;
+    }
+
     public enum LookupMode {
         BALANCED, // this uses inner nodes as well, so it's probably
         VIA_LEAVES; // this is simpler and maybe faster
@@ -54,16 +62,16 @@ public class LookupRequest extends MessageBody {
         static KeyPosition getPosition(long key, long minRange, long maxRange) {
             if (key < minRange) return LESS;
             else if (key > maxRange) return GREATER;
-            else if (key == minRange) return L_ADJ;
-            else if (key == maxRange) return R_ADJ;
+            // else if (key == minRange) return L_ADJ;
+            // else if (key == maxRange) return R_ADJ;
             else return null;
         }
 
         KeyPosition invert() {
             if (this == LESS) return GREATER;
             else if (this == GREATER) return LESS;
-            else if (this == R_ADJ) return L_ADJ;
-            else if (this == L_ADJ) return R_ADJ;
+            // else if (this == R_ADJ) return L_ADJ;
+            // else if (this == L_ADJ) return R_ADJ;
             else return null;
         }
     }
@@ -92,6 +100,7 @@ public class LookupRequest extends MessageBody {
         this.mode = LookupMode.VIA_LEAVES;
         this.keyRTDistance = -1;
         this.queue = new LinkedList<Long>();
+        locality = Locality.UNDEFINED;
         // this.lowerBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
         // this.upperBound = new Bound(-Double.MAX_VALUE, RoutingTable.DEF_VAL);
     }
@@ -114,6 +123,22 @@ public class LookupRequest extends MessageBody {
 
     public int getKeyRTDistance() {
         return this.keyRTDistance;
+    }
+
+    public Locality getLocality() {
+        return this.locality;
+    }
+
+    public void enhanceLocality() {
+        if (this.locality == Locality.UNDEFINED) {
+            this.locality = Locality.LEAVES;
+        }
+        else if (this.locality == Locality.LEAVES) {
+            this.locality = Locality.IMMEDIATE_AREA;
+        }
+        else if (this.locality == Locality.IMMEDIATE_AREA) {
+            this.locality = Locality.EXACT;
+        }
     }
 
     public KeyPosition getKeyPosition() {
