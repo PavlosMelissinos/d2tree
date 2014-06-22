@@ -19,3 +19,5 @@ _deleteLogs.bat
 answers.txt
 UML/
 *.uml
+run simulator +gui.bat
+run simulator.bat

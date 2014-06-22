@@ -6,8 +6,8 @@ public class D2TreeMessageT extends MessageT {
     private static final long serialVersionUID       = 2160112452787414344L;
     static final int          JOIN_REQ               = 1001;
     static final int          JOIN_RES               = 1002;
-    static final int          LEAVE_REQ             = 1003;
-    static final int          LEAVE_RES             = 1004;
+    static final int          LEAVE_REQ              = 1003;
+    static final int          LEAVE_RES              = 1004;
 
     static final int          CONNECT_MSG            = 1011;
     static final int          DISCONNECT_MSG         = 1012;

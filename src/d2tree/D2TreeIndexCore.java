@@ -2,6 +2,7 @@ package d2tree;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.TreeSet;
 
 import p2p.simulator.message.DeleteResponse;
@@ -18,39 +19,40 @@ import d2tree.LookupRequest.LookupPhase;
 import d2tree.RoutingTable.Role;
 
 public class D2TreeIndexCore {
-    Network             net;
-    private long        id;
-    TreeSet<Long>       keys;
-    private int         pendingQueries;
+    Network                       net;
+    private long                  id;
+    TreeSet<Long>                 keys;
+    private int                   pendingQueries;
     // static final String indexLogFile = PrintMessage.indexLogDir +
     // "lookup.txt";
-    static final String indexLogFile = "lookup.txt";
-    double              lVWeight;
-    double              rVWeight;
-    double              bVWeight;
-    double              vWeight;
+    static final String           indexLogFile = "lookup.txt";
+    double                        lVWeight;
+    double                        rVWeight;
+    double                        bVWeight;
+    double                        vWeight;
+    static HashMap<Long, Integer> totalRequests;
 
     // legacy data
-    TreeSet<Long>       legacyKeys;
-    private long        legacyHost;
+    TreeSet<Long>                 legacyKeys;
+    private long                  legacyHost;
 
     // static long MIN_VALUE = -1000000; // -Long.MAX_VALUE;
     // static long MAX_VALUE = 1000000; // Long.MAX_VALUE;
-    static long         MIN_VALUE    = -Long.MAX_VALUE;
-    static long         MAX_VALUE    = Long.MAX_VALUE;
+    static long                   MIN_VALUE    = -Long.MAX_VALUE;
+    static long                   MAX_VALUE    = Long.MAX_VALUE;
 
     D2TreeIndexCore(long id, Network network) {
         this.net = network;
         this.id = id;
         keys = new TreeSet<Long>();
-        // if (id == 1) keys.add(0L);
         legacyKeys = new TreeSet<Long>();
-        // legacyKeys.add();
         this.pendingQueries = 0;
         this.lVWeight = 0;
         this.rVWeight = 0;
         this.bVWeight = 0;
         this.vWeight = 0;
+        if (totalRequests == null)
+            totalRequests = new HashMap<Long, Integer>();
     }
 
     D2TreeIndexCore(D2TreeIndexCore anotherIndexCore) {
@@ -64,6 +66,8 @@ public class D2TreeIndexCore {
         this.rVWeight = anotherIndexCore.rVWeight;
         this.bVWeight = anotherIndexCore.bVWeight;
         this.vWeight = anotherIndexCore.vWeight;
+        if (totalRequests == null)
+            totalRequests = new HashMap<Long, Integer>();
     }
 
     void setID(long id) {
@@ -332,9 +336,12 @@ public class D2TreeIndexCore {
             Role role = Role.RIGHT_RT;
             if (newPos == KeyPosition.LESS) {
                 role = Role.LEFT_RT;
-                if (coreRT.isEmpty(role)) resolveSubrequest(msg);
+                if (coreRT.isEmpty(role)) {
+                    resolveSubrequest(msg);
+                    return;
+                }
             }
-            if (keyDistance < 0) {
+            if (keyDistance < 0 || keyDistance > coreRT.size(role) + 1) {
                 keyDistance = coreRT.size(role) + 1;
             }
             keyDistance--;
@@ -365,6 +372,7 @@ public class D2TreeIndexCore {
             }
             else {
                 targetNodeId = coreRT.get(role, (int) keyDistance - 1);
+                if (targetNodeId <= 0) System.out.println(coreRT);
                 assert targetNodeId > 0;
             }
 
@@ -754,10 +762,16 @@ public class D2TreeIndexCore {
     void send(Message msg) {
         assert msg.getDestinationId() != this.id;
         assert msg.getDestinationId() != RoutingTable.DEF_VAL;
+        long dest = msg.getDestinationId();
+        int requests = 0;
+        if (totalRequests.containsKey(dest))
+            requests = totalRequests.get(dest);
+        requests++;
+        totalRequests.put(dest, requests);
         net.sendMsg(msg);
     }
 
     public void lookupResponse() {
-        decreasePendingQueries();
+        // decreasePendingQueries();
     }
 }

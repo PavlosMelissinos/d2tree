@@ -11,6 +11,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -30,7 +31,10 @@ public class PrintMessage extends MessageBody {
     // private boolean down;
     private long         initialNode;
     private int          msgType;
-    static final String  logDir         = "D:/logs/";
+    // static final String logDir = "D:/logs/";
+    static final String  logDir         = Paths.get("").toAbsolutePath()
+                                                .toString() +
+                                                "/d2treelogs/";
     static final String  indexLogDir    = logDir + "index/";
     // public static String logDir = "../logs/";
     static final String  allLogFile     = logDir + "main.txt";

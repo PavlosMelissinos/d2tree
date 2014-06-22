@@ -2075,4 +2075,14 @@ public class D2TreeCore {
             e.printStackTrace();
         }
     }
+
+    public void init(RoutingTable rt, Integer minHeight) {
+        this.setRT(rt);
+        long nodeDepth = rt.getDepth();
+        long subtreeHeight = D2Tree.minHeight - nodeDepth;
+        long subtreeSize = (long) Math.pow(2, subtreeHeight) - 1;
+        long subtreeBuckets = (long) Math.pow(2, subtreeHeight - 1);
+        long totalSubtreeSize = subtreeSize + subtreeBuckets * D2Tree.minHeight;
+        this.vWeight = totalSubtreeSize;
+    }
 }

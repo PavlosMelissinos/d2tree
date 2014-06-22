@@ -2,6 +2,9 @@ package d2tree;
 
 import java.io.IOException;
 import java.lang.Thread.State;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,16 +36,22 @@ public class D2Tree extends Peer {
     private static ArrayList<Integer>    introducers;
     private static HashMap<Long, D2Tree> allNodes;
 
-    final static int                     minHeight = 6;
+    static Integer                       minHeight;
+    final static Path                    configPath = FileSystems
+                                                            .getDefault()
+                                                            .getPath(
+                                                                    "protocols",
+                                                                    "d2tree-config.ini");
 
     private static ArrayList<Long>       initialKeys;
     private static ArrayList<Long>       adjacencies;
 
-    private long                         n;              // nodes
-    private long                         k;              // keyspace
+    private long                         n;                                              // nodes
+    private long                         k;                                              // keyspace
 
     private int getRandomIntroducer() {
         randomGenerator = new Random();
+        assert !introducers.isEmpty();
         if (introducers.isEmpty()) return (int) RoutingTable.DEF_VAL;
         int index = randomGenerator.nextInt(D2Tree.introducers.size());
         return D2Tree.introducers.get(index);
@@ -59,10 +68,63 @@ public class D2Tree extends Peer {
         this.state = Thread.State.NEW;
         this.Core = new D2TreeCore(Id, Net);
         this.indexCore = new D2TreeIndexCore(Id, Net);
-
         if (D2Tree.introducers == null)
             D2Tree.introducers = new ArrayList<Integer>();
-        // if (D2Tree.introducers.isEmpty()) D2Tree.introducers.add(1);
+
+        // read config file
+        if (minHeight == null) {
+            // initiate variables
+            int maxHeight = (int) (Math.log(Long.highestOneBit(n)) / Math
+                    .log(2)) - 1;
+
+            int minPBTNodes = (int) Math.pow(2, maxHeight) - 1;
+            int minLeaves = (int) Math.pow(2, maxHeight - 1);
+            if (minPBTNodes + minLeaves * maxHeight > n) {
+                maxHeight--;
+            }
+
+            assert introducers.isEmpty();
+
+            try {
+                List<String> lines = Files.readAllLines(configPath);
+                int proposedHeight = Integer.parseInt(lines.get(0));
+                float introducersRate = Math
+                        .abs(Float.parseFloat(lines.get(1)));
+                if (proposedHeight <= 0 || proposedHeight > maxHeight) {
+                    // build with maximum possible height
+                    minHeight = maxHeight;
+                }
+                else {
+                    // use proposed height
+                    minHeight = proposedHeight;
+                }
+
+                minPBTNodes = (int) Math.pow(2, minHeight) - 1;
+                minLeaves = (int) Math.pow(2, minHeight - 1);
+                int startingNodes = minPBTNodes + minLeaves * minHeight;
+                Random generator = new Random();
+                int introducersSize = 0;
+                if (introducersRate > 1) introducersSize = (int) introducersRate;
+                else introducersSize = startingNodes * (int) introducersRate;
+
+                while (introducers.size() < introducersSize) {
+                    introducers.add(generator.nextInt(startingNodes) + 1);
+                }
+
+                D2Tree.adjacencies = new ArrayList<Long>();
+                computeAdjacencies(minPBTNodes);
+                System.out.println("Initializing with height " + minHeight);
+            }
+            catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            catch (IndexOutOfBoundsException e) {
+                System.err
+                        .println("Config file should contain a proposed value for an absolute maximum D2 Tree height (negative for indefinite)");
+                e.printStackTrace();
+            }
+        }
 
         if (allNodes == null) allNodes = new HashMap<Long, D2Tree>();
         allNodes.put(Id, this);
@@ -72,27 +134,27 @@ public class D2Tree extends Peer {
 
         if (k < n) k = n;
         long averageKeySpace = k / n;
-        // TreeSet<Long> fullKeyset = new TreeSet<Long>();
         if (initialKeys == null) {
+            initialKeys = new ArrayList<Long>();
             Random rand = new Random();
-            TreeSet<Long> tempKeyList = new TreeSet<Long>();
-            while (tempKeyList.size() < n * averageKeySpace) {
-                // fullKeyset.add((long) Math.random() * diff + minValue);
-                tempKeyList.add(rand.nextLong());
+            long keySpace = n * averageKeySpace;
+            System.out.println("Generating " + keySpace + " random keys:");
+            int percentage = 0;
+            while (initialKeys.size() < keySpace) {
+                if (initialKeys.size() % (keySpace / 10) == 0) {
+                    System.out.println(percentage + "% of keys generated");
+                    percentage += 10;
+                }
+                initialKeys.add(rand.nextLong());
             }
-            initialKeys = new ArrayList<Long>(tempKeyList);
-            // for (int i = 0; i < fullKeyset.size(); i += partitionSize) {
-            // partitions.add(originalList.subList(i,
-            // i + Math.min(partitionSize, originalList.size() - i)));
-            // }
+            System.out.println("Key generation complete.");
+            System.out.println("Sorting list");
+            Collections.sort(initialKeys);
         }
 
         if (id <= minPBTNodes) {
             isOnline = true;
-            if (adjacencies == null) {
-                adjacencies = new ArrayList<Long>();
-                adjacencies.add(Id);
-            }
+            assert adjacencies != null;
             // we initialize some nodes for the tree structure (2^h - 1)
             initializePBT(minPBTNodes, averageKeySpace);
             if (id == minPBTNodes) {
@@ -121,11 +183,11 @@ public class D2Tree extends Peer {
             isOnline = true;
             if (Id == minPBTNodes + minLeaves * minHeight) {
                 System.out.println("Bucket initialization complete.");
-                PrintMessage data = new PrintMessage(D2TreeMessageT.JOIN_REQ,
-                        Id);
                 if (D2Tree.introducers.isEmpty()) D2Tree.introducers.add(1);
+                // PrintMessage data = new PrintMessage(D2TreeMessageT.JOIN_REQ,
+                // Id);
                 // PrintMessage.printTreeByIndex(allNodes, msg, logFile);
-                Core.printTree(new Message(id, id, data));
+                // Core.printTree(new Message(id, id, data));
             }
             return;
         }
@@ -704,23 +766,32 @@ public class D2Tree extends Peer {
         /*
          * set left adjacent
          */
-        long lAdj = findLAdj(minPBTNodes);
-        if (lAdj != RoutingTable.DEF_VAL) {
-            rt.set(Role.LEFT_A_NODE, lAdj);
-            if (!D2Tree.adjacencies.contains(lAdj))
-                D2Tree.adjacencies.add(nodeIndex, lAdj);
-        }
+        // long lAdj = findLAdj(minPBTNodes);
+        // if (lAdj != RoutingTable.DEF_VAL) {
+        // rt.set(Role.LEFT_A_NODE, lAdj);
+        // if (!D2Tree.adjacencies.contains(lAdj))
+        // D2Tree.adjacencies.add(nodeIndex, lAdj);
+        // }
 
         nodeIndex = adjacencies.indexOf(Id);
+        if (nodeIndex > 0) {
+            long lAdj = adjacencies.get(nodeIndex - 1);
+            rt.set(Role.LEFT_A_NODE, lAdj);
+        }
         /*
          * set right adjacent
          */
-        long rAdj = findRAdj(minPBTNodes, lAdj);
-        if (rAdj != RoutingTable.DEF_VAL) {
+
+        if (nodeIndex + 1 < adjacencies.size()) {
+            long rAdj = adjacencies.get(nodeIndex + 1);
             rt.set(Role.RIGHT_A_NODE, rAdj);
-            if (!D2Tree.adjacencies.contains(rAdj))
-                D2Tree.adjacencies.add(nodeIndex + 1, rAdj);
         }
+        // long rAdj = findRAdj(minPBTNodes, lAdj);
+        // if (rAdj != RoutingTable.DEF_VAL) {
+        // rt.set(Role.RIGHT_A_NODE, rAdj);
+        // if (!D2Tree.adjacencies.contains(rAdj))
+        // D2Tree.adjacencies.add(nodeIndex + 1, rAdj);
+        // }
 
         /*
          * set leftRT
@@ -762,52 +833,67 @@ public class D2Tree extends Peer {
             rt.set(Role.LAST_BUCKET_NODE, lastBucketNode);
         }
 
+        Core.init(rt, minHeight);
+
         this.indexCore.keys = findCorrespondingKeys(minPBTNodes,
                 averageKeySpace);
-        // if (Id != 1)
-        Core.setRT(rt);
     }
 
-    private long findLAdj(long minPBTNodes) {
-
-        long leftmostLeaf = (minPBTNodes + 1) / 2;
-        long lAdj = RoutingTable.DEF_VAL;
-
-        if (Id > leftmostLeaf) {
-            // this is a leaf and left adjacent is an inner node
-            // left adjacent
-
-            // long leafIndex = Id - leftmostLeaf;
-            // lAdj = adjacencies.get(2 * (int) leafIndex - 1);
-
-            int index = adjacencies.indexOf(Id);
-            if (index != 0) {
-                assert index > 0;
-                lAdj = adjacencies.get(index - 1);
+    private void computeAdjacencies(long nodesSpace) {
+        // adjacencies.add(1L);
+        int i = 1;
+        int levelSize = 1;
+        do {
+            for (i = levelSize; i < 2 * levelSize; i++) {
+                int index = 2 * (i - levelSize);
+                long value = i;
+                adjacencies.add(index, value);
             }
-        }
-        else if (Id < leftmostLeaf) {
-            // this is an inner node and left adjacent is a leaf
-            lAdj = 2 * Id; // begin with the left child
-            while (lAdj < leftmostLeaf) {
-                lAdj = 2 * lAdj + 1;
-            }
-        }
+            levelSize *= 2;
 
-        return lAdj;
+        } while (i <= nodesSpace);
     }
 
-    private long findRAdj(long minPBTNodes, long lAdj) {
-        long rightmostLeaf = minPBTNodes;
-        long rAdj = RoutingTable.DEF_VAL;
-        if (lAdj > Id) {
-            rAdj = lAdj + 1;
-        }
-        else if (Id < rightmostLeaf) {
-            rAdj = adjacencies.get(adjacencies.indexOf(Id) + 1);
-        }
-        return rAdj;
-    }
+    // private long findLAdj(long minPBTNodes) {
+    //
+    // long leftmostLeaf = (minPBTNodes + 1) / 2;
+    // long lAdj = RoutingTable.DEF_VAL;
+    //
+    // if (Id > leftmostLeaf) {
+    // // this is a leaf and left adjacent is an inner node
+    // // left adjacent
+    //
+    // // long leafIndex = Id - leftmostLeaf;
+    // // lAdj = adjacencies.get(2 * (int) leafIndex - 1);
+    //
+    // int index = adjacencies.indexOf(Id);
+    // if (index != 0) {
+    // assert index > 0;
+    // lAdj = adjacencies.get(index - 1);
+    // }
+    // }
+    // else if (Id < leftmostLeaf) {
+    // // this is an inner node and left adjacent is a leaf
+    // lAdj = 2 * Id; // begin with the left child
+    // while (lAdj < leftmostLeaf) {
+    // lAdj = 2 * lAdj + 1;
+    // }
+    // }
+    //
+    // return lAdj;
+    // }
+    //
+    // private long findRAdj(long minPBTNodes, long lAdj) {
+    // long rightmostLeaf = minPBTNodes;
+    // long rAdj = RoutingTable.DEF_VAL;
+    // if (lAdj > Id) {
+    // rAdj = lAdj + 1;
+    // }
+    // else if (Id < rightmostLeaf) {
+    // rAdj = adjacencies.get(adjacencies.indexOf(Id) + 1);
+    // }
+    // return rAdj;
+    // }
 
     void initializeBuckets(long minPBTNodes, long minBucketNodes,
             long averageKeySpace) {
@@ -839,8 +925,8 @@ public class D2Tree extends Peer {
         long repr = leftmostLeaf + bucketIndex;
         rt.set(Role.REPRESENTATIVE, repr);
 
-        indexCore.keys = findCorrespondingKeys(minPBTNodes, averageKeySpace);
         Core.setRT(rt);
+        indexCore.keys = findCorrespondingKeys(minPBTNodes, averageKeySpace);
     }
 
     private TreeSet<Long> findCorrespondingKeys(long minPBTNodes,
@@ -854,14 +940,16 @@ public class D2Tree extends Peer {
 
         if (Id <= minPBTNodes) {
             long nodeLevel = (long) (Math.log(leftmostNodeLevel) / Math.log(2)) + 1;
-            long nodeLevelDistanceFromBottom = treeHeight - nodeLevel;
+            // long nodeLevelDistanceFromBottom = treeHeight - nodeLevel;
 
             // nodes of this level appear every nodeInterval nodes
-            long nodeInterval = (long) Math.pow(2,
-                    nodeLevelDistanceFromBottom + 1);
 
-            long nodeInorderIndex = nodeInterval / 2 * (nodeIndexAtLevel + 1) -
-                    1;
+            // long nodeInterval = (long) Math.pow(2,
+            // nodeLevelDistanceFromBottom + 1);
+            //
+            // long nodeInorderIndex = nodeInterval / 2 * (nodeIndexAtLevel + 1)
+            // - 1;
+            long nodeInorderIndex = D2Tree.adjacencies.indexOf(Id);
 
             long bucketNodesBetween = (nodeInorderIndex + 1) / 2 * bucketSize;
 
