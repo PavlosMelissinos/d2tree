@@ -107,9 +107,12 @@ public class D2Tree extends Peer {
                 if (introducersRate > 1) introducersSize = (int) introducersRate;
                 else introducersSize = startingNodes * (int) introducersRate;
 
-                while (introducers.size() < introducersSize) {
-                    introducers.add(generator.nextInt(startingNodes) + 1);
+                for (int i = 0; i < startingNodes; i++) {
+                    introducers.add(i + 1);
                 }
+                Collections.shuffle(introducers);
+                introducers = new ArrayList<Integer>(introducers.subList(0,
+                        introducersSize));
 
                 D2Tree.adjacencies = new ArrayList<Long>();
                 computeAdjacencies(minPBTNodes);
@@ -135,9 +138,9 @@ public class D2Tree extends Peer {
         if (k < n) k = n;
         long averageKeySpace = k / n;
         if (initialKeys == null) {
-            initialKeys = new ArrayList<Long>();
             Random rand = new Random();
             long keySpace = n * averageKeySpace;
+            initialKeys = new ArrayList<Long>((int) keySpace);
             System.out.println("Generating " + keySpace + " random keys:");
             int percentage = 0;
             while (initialKeys.size() < keySpace) {
@@ -195,6 +198,7 @@ public class D2Tree extends Peer {
             TreeSet<Long> values = D2Tree.generateRandomValues(n, k);
             indexCore.keys.addAll(values);
             assert !indexCore.keys.isEmpty();
+            // isOnline = true;
         }
     }
 
@@ -209,8 +213,8 @@ public class D2Tree extends Peer {
     }
 
     private void resolveMessage(Message msg) {
-        logger.logp(Level.FINEST, this.getClass().getName(), "resolveMsg",
-                msg.toString());
+        // logger.logp(Level.FINEST, this.getClass().getName(), "resolveMsg",
+        // msg.toString());
 
         int mType;
         PrintMessage.print(msg, "Node " + msg.getDestinationId() +
@@ -413,7 +417,7 @@ public class D2Tree extends Peer {
         int minLeaves = (int) Math.pow(2, minHeight - 1);
 
         long nodeTotal = minPBTNodes + minLeaves * minHeight;
-        if (Id < nodeTotal) return;
+        if (Id <= nodeTotal) return;
         // introducers.add((int) this.Id);
         // msg = new Message(Id, introducer, new JoinRequest());
         msg = new Message(Id, getRandomIntroducer(), new JoinRequest());
@@ -939,16 +943,6 @@ public class D2Tree extends Peer {
         long bucketSize = treeHeight;
 
         if (Id <= minPBTNodes) {
-            long nodeLevel = (long) (Math.log(leftmostNodeLevel) / Math.log(2)) + 1;
-            // long nodeLevelDistanceFromBottom = treeHeight - nodeLevel;
-
-            // nodes of this level appear every nodeInterval nodes
-
-            // long nodeInterval = (long) Math.pow(2,
-            // nodeLevelDistanceFromBottom + 1);
-            //
-            // long nodeInorderIndex = nodeInterval / 2 * (nodeIndexAtLevel + 1)
-            // - 1;
             long nodeInorderIndex = D2Tree.adjacencies.indexOf(Id);
 
             long bucketNodesBetween = (nodeInorderIndex + 1) / 2 * bucketSize;
